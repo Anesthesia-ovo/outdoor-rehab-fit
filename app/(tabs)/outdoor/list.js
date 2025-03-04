@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useContext } from "react";
 import { View, Text, Image, StyleSheet, FlatList, TouchableOpacity } from "react-native";
-import SearchBar from "../../components/SearchBar";
+import SearchBar from "../../../components/SearchBar";
 import { useLocalSearchParams } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useNavigation } from "expo-router";
-import { LocaleContext } from "../../contexts/LocaleContext";
+import { LocaleContext } from "../../../contexts/LocaleContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { RFValue } from "react-native-responsive-fontsize";
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";

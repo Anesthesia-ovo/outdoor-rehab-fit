@@ -14,8 +14,13 @@ export default function HomeScreen() {
 			icon: require("@/assets/icons/outdoor.png"),
 			route: "outdoor",
 		},
-		{ color: "#E8CCB0", text: i18n.t("risk"), icon: require("@/assets/icons/risks.png"), route: "risk" },
-		{ color: "#F2CCC0", text: i18n.t("location"), icon: require("@/assets/icons/map.png"), route: "location" },
+		{ color: "#E8CCB0", text: i18n.t("risk"), icon: require("@/assets/icons/risks.png"), route: "(tabs)/risk" },
+		{
+			color: "#F2CCC0",
+			text: i18n.t("location"),
+			icon: require("@/assets/icons/map.png"),
+			route: "(tabs)/location",
+		},
 		{ color: "#ECDD93", text: i18n.t("research"), icon: require("@/assets/icons/school.png"), route: "research" },
 	];
 

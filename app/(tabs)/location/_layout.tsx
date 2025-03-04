@@ -1,10 +1,10 @@
 import React, { useContext } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, router } from "expo-router";
-import { LocaleContext } from "../../contexts/LocaleContext";
-import { TouchableOpacity } from "react-native";
+import { LocaleContext } from "../../../contexts/LocaleContext";
+import { TouchableOpacity, Text } from "react-native";
 
-export default function ResearchLayout() {
+export default function LocationLayout() {
 	const { i18n } = useContext(LocaleContext);
 
 	const renderBackButton = () => (
@@ -22,8 +22,7 @@ export default function ResearchLayout() {
 			<Stack.Screen
 				name="index"
 				options={{
-					headerShown: false,
-					title: i18n.t("research"),
+					title: i18n.t("location"),
 					headerLeft: renderBackButton,
 				}}
 			/>

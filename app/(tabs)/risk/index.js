@@ -2,7 +2,7 @@ import React, { useContext, useEffect } from "react";
 import { StyleSheet, View, Text, TouchableOpacity } from "react-native";
 import { router } from "expo-router";
 import { AntDesign } from "@expo/vector-icons"; // Make sure to install this package
-import { LocaleContext } from "../../contexts/LocaleContext";
+import { LocaleContext } from "../../../contexts/LocaleContext";
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
 import { RFValue } from "react-native-responsive-fontsize";
 

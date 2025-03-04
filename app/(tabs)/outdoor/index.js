@@ -2,8 +2,8 @@ import React, { useContext } from "react";
 import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StyleSheet, View, Text, TouchableOpacity, Image, Dimensions, ScrollView } from "react-native";
-import CustomBackButton from "../../components/CustomBackButton";
-import { LocaleContext } from "../../contexts/LocaleContext";
+import CustomBackButton from "../../../components/CustomBackButton";
+import { LocaleContext } from "../../../contexts/LocaleContext";
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
 import { RFValue } from "react-native-responsive-fontsize";
 

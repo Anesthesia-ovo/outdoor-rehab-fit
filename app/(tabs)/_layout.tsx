@@ -74,6 +74,10 @@ export default function TabLayout() {
 					headerLeft: renderBackButton,
 				}}
 			/>
+			<Tabs.Screen name="risk" options={{ href: null }} />
+			<Tabs.Screen name="outdoor" options={{ href: null }} />
+			<Tabs.Screen name="location" options={{ href: null }} />
+			<Tabs.Screen name="research" options={{ href: null }} />
 		</Tabs>
 	);
 }

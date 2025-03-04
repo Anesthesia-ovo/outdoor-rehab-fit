@@ -1,28 +1,33 @@
 import React, { useContext } from "react";
 import { StyleSheet, View, ScrollView, Text, TouchableOpacity, SafeAreaView, Alert } from "react-native";
-import { LocaleContext } from "../../contexts/LocaleContext";
-import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
+import { LocaleContext } from "../../../contexts/LocaleContext";
 import { RFValue } from "react-native-responsive-fontsize";
+import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
 
-const Safety = () => {
+const Questionnaire = () => {
 	const { i18n } = useContext(LocaleContext);
 	return (
 		<SafeAreaView style={styles.container}>
-			<Text style={styles.title}>{i18n.t("sprm")}</Text>
+			<Text style={styles.title}>{i18n.t("parq")}</Text>
 			<ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollViewContent}>
-				<Text style={styles.text}>{i18n.t("safety")}</Text>
+				<Text style={styles.text}>{i18n.t("questionnaireInfo")}</Text>
 			</ScrollView>
 			<View style={styles.buttonContainer}>
-				<TouchableOpacity style={styles.button} onPress={() => Alert.alert("", i18n.t("agreeQuestionnaire"))}>
-					<Text style={styles.buttonText}>{i18n.t("agreeSafety")}</Text>
+				<TouchableOpacity
+					style={styles.button}
+					onPress={() => {
+						Alert.alert("", i18n.t("questionnaireNo"));
+					}}
+				>
+					<Text style={styles.buttonText}>{i18n.t("yes")}</Text>
 				</TouchableOpacity>
 				<TouchableOpacity
-					style={[styles.button, { backgroundColor: "#dc3545" }]}
+					style={[styles.button, { backgroundColor: "#AAA" }]} //gray button
 					onPress={() => {
 						Alert.alert(i18n.t("warning"), i18n.t("questionnaireYes"));
 					}}
 				>
-					<Text style={styles.buttonText}>{i18n.t("disagreeSafety")}</Text>
+					<Text style={styles.buttonText}>{i18n.t("no")}</Text>
 				</TouchableOpacity>
 			</View>
 		</SafeAreaView>
@@ -34,7 +39,7 @@ const styles = StyleSheet.create({
 		flex: 1,
 	},
 	title: {
-		fontSize: 24,
+		fontSize: RFValue(20),
 		fontWeight: "bold",
 		color: "#007BFF",
 		padding: 20,
@@ -73,4 +78,4 @@ const styles = StyleSheet.create({
 	},
 });
 
-export default Safety;
+export default Questionnaire;

@@ -4,11 +4,11 @@ import { useLocalSearchParams } from "expo-router";
 import { Collapsible } from "@/components/Collapsible";
 import { ThemedText } from "@/components/ThemedText";
 import { useNavigation } from "expo-router";
-import { LocaleContext } from "../../contexts/LocaleContext";
+import { LocaleContext } from "../../../contexts/LocaleContext";
 import YoutubePlayer from "react-native-youtube-iframe";
 import AudioPlayer from "@/components/AudioPlayer";
 import { Ionicons } from "@expo/vector-icons";
-import { enSoundFiles, zhSoundFiles, gifFiles1, gifFiles2 } from "../../constants/Equipments";
+import { enSoundFiles, zhSoundFiles, gifFiles1, gifFiles2 } from "../../../constants/Equipments";
 import { RFValue } from "react-native-responsive-fontsize";
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
 

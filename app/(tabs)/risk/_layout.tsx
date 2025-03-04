@@ -1,18 +1,18 @@
 import React, { useContext } from "react";
-import { Ionicons } from "@expo/vector-icons";
 import { Stack, router } from "expo-router";
-import { LocaleContext } from "../../contexts/LocaleContext";
 import { TouchableOpacity } from "react-native";
+import { LocaleContext } from "../../../contexts/LocaleContext";
+import { Ionicons } from "@expo/vector-icons";
 import { RFValue } from "react-native-responsive-fontsize";
 
 export default function RiskLayout() {
 	const { i18n } = useContext(LocaleContext);
 
-	// const renderBackButton = () => (
-	// 	<TouchableOpacity onPress={() => router.navigate("/(tabs)")}>
-	// 		<Ionicons name="chevron-back" size={RFValue(18)} color={"#000"} />
-	// 	</TouchableOpacity>
-	// );
+	const renderBackButton = () => (
+		<TouchableOpacity onPress={() => router.navigate("/(tabs)")}>
+			<Ionicons name="chevron-back" size={RFValue(18)} color={"#000"} />
+		</TouchableOpacity>
+	);
 
 	return (
 		<Stack
@@ -25,6 +25,7 @@ export default function RiskLayout() {
 				options={{
 					headerShown: true,
 					title: i18n.t("risk"),
+					headerLeft: renderBackButton,
 				}}
 			/>
 			<Stack.Screen

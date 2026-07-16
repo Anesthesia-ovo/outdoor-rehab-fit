@@ -94,6 +94,7 @@ const styles = StyleSheet.create({
 		position: "absolute",
 		bottom: hp("4%"),
 		alignSelf: "center",
+		width: wp("92%"),
 	},
 	buttonsContainer: {
 		backgroundColor: "#fff",

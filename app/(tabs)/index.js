@@ -1,12 +1,19 @@
 import React, { useContext } from "react";
-import { StyleSheet, View, Text, TouchableOpacity, Image, ScrollView } from "react-native";
+import { Platform, StyleSheet, View, Text, TouchableOpacity, Image, ScrollView } from "react-native";
 import { router } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LocaleContext } from "../../contexts/LocaleContext";
 import { RFValue } from "react-native-responsive-fontsize";
 import WeatherComponent from "../../components/WeatherComponent";
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
+
+const TAB_BAR_HEIGHT = 100;
+
 export default function HomeScreen() {
 	const { i18n } = useContext(LocaleContext);
+	const insets = useSafeAreaInsets();
+	const bottomInset =
+		Platform.OS === "ios" ? TAB_BAR_HEIGHT + Math.max(insets.bottom, 8) : Math.max(insets.bottom, 16);
 	const buttons = [
 		{
 			color: "#F0E4C2",
@@ -36,7 +43,7 @@ export default function HomeScreen() {
 	};
 
 	return (
-		<ScrollView contentContainerStyle={styles.contentContainer}>
+		<ScrollView contentContainerStyle={[styles.contentContainer, { paddingBottom: bottomInset }]}>
 			<View style={styles.imageContainer}>
 				<Image source={require("@/assets/images/hk.jpg")} style={styles.photo} />
 				<Text style={styles.greeting}>{getGreeting()},</Text>
@@ -103,11 +110,10 @@ const styles = StyleSheet.create({
 		flexDirection: "row",
 		flexWrap: "wrap",
 		justifyContent: "space-between",
-		marginTop: hp("-3%"), // Added negative margin to overlap with the image
-		paddingTop: hp("2%"), // Added padding to control spacing
-		paddingHorizontal: wp("7%"), // Added padding to control spacing
-		paddingBottom: hp("5%"), // Added padding to control spacing
-		marginBottom: hp("10%"), // Added margin to control spacing
+		marginTop: hp("-3%"),
+		paddingTop: hp("2%"),
+		paddingHorizontal: wp("7%"),
+		paddingBottom: hp("2%"),
 	},
 	buttonWrapper: {
 		width: "45%",

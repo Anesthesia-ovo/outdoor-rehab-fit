@@ -1,13 +1,19 @@
 import React, { useContext, useState } from "react";
-import { View, Text, FlatList, Image, StyleSheet, TouchableOpacity } from "react-native";
+import { Platform, View, Text, FlatList, Image, StyleSheet, TouchableOpacity } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { LocaleContext } from "../../contexts/LocaleContext";
 import { router } from "expo-router";
 
+const TAB_BAR_HEIGHT = 100;
+
 const Favourite = () => {
 	const { i18n, locale, changeLanguage } = useContext(LocaleContext);
+	const insets = useSafeAreaInsets();
+	const bottomInset =
+		Platform.OS === "ios" ? TAB_BAR_HEIGHT + Math.max(insets.bottom, 8) : Math.max(insets.bottom, 16);
 	const equipmentData = i18n.t("equipmentList", { returnObjects: true });
 	const [bookmarkedItems, setBookmarkedItems] = useState([]);
 	const [bookmarked, setBookmarked] = useState({});
@@ -70,7 +76,7 @@ const Favourite = () => {
 		<View style={styles.container}>
 			<FlatList
 				data={bookmarkedItems}
-				contentContainerStyle={{ paddingTop: 16 }} // Add spacing at the top
+				contentContainerStyle={{ paddingTop: 16, paddingBottom: bottomInset }}
 				keyExtractor={(item) => item.id.toString()}
 				renderItem={({ item }) => (
 					<TouchableOpacity

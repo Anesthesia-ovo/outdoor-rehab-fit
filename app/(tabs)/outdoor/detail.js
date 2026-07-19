@@ -1,9 +1,10 @@
 import React, { useEffect, useContext, useState } from "react";
-import { StyleSheet, View, Text, ScrollView, Modal, TouchableOpacity, Image } from "react-native";
+import { Platform, StyleSheet, View, Text, ScrollView, Modal, TouchableOpacity, Image } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { Collapsible } from "@/components/Collapsible";
 import { ThemedText } from "@/components/ThemedText";
 import { useNavigation } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LocaleContext } from "../../../contexts/LocaleContext";
 import YoutubePlayer from "react-native-youtube-iframe";
 import AudioPlayer from "@/components/AudioPlayer";
@@ -12,10 +13,15 @@ import { enSoundFiles, zhSoundFiles, gifFiles1, gifFiles2 } from "../../../const
 import { RFValue } from "react-native-responsive-fontsize";
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
 
+const TAB_BAR_HEIGHT = 100;
+
 const Detail = () => {
 	const { i18n, locale } = useContext(LocaleContext);
 	const item = useLocalSearchParams();
 	const navigation = useNavigation();
+	const insets = useSafeAreaInsets();
+	const bottomInset =
+		Platform.OS === "ios" ? TAB_BAR_HEIGHT + Math.max(insets.bottom, 8) : Math.max(insets.bottom, 16);
 
 	const [modalVisible, setModalVisible] = useState(false);
 	const [selectedImage, setSelectedImage] = useState(null);
@@ -41,7 +47,7 @@ const Detail = () => {
 	}
 
 	return (
-		<ScrollView contentContainerStyle={styles.container}>
+		<ScrollView contentContainerStyle={[styles.container, { paddingBottom: bottomInset }]}>
 			<Modal visible={modalVisible} transparent={true} onRequestClose={closeModal}>
 				<View style={styles.modalContainer}>
 					<View style={styles.modalContent}>

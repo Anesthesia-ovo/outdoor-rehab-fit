@@ -1,16 +1,23 @@
 import React, { useState, useEffect, useContext } from "react";
-import { View, Text, Image, StyleSheet, FlatList, TouchableOpacity } from "react-native";
+import { Platform, View, Text, Image, StyleSheet, FlatList, TouchableOpacity } from "react-native";
 import SearchBar from "../../../components/SearchBar";
 import { useLocalSearchParams } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useNavigation } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LocaleContext } from "../../../contexts/LocaleContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { RFValue } from "react-native-responsive-fontsize";
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
+
+const TAB_BAR_HEIGHT = 100;
+
 const EquipmentList = () => {
 	const { i18n } = useContext(LocaleContext);
+	const insets = useSafeAreaInsets();
+	const bottomInset =
+		Platform.OS === "ios" ? TAB_BAR_HEIGHT + Math.max(insets.bottom, 8) : Math.max(insets.bottom, 16);
 	const equipmentData = i18n.t("equipmentList", { returnObjects: true });
 	const buttons = [
 		{ icon: require("@/assets/icons/outdoor/list.png"), text: i18n.t("all") },
@@ -86,7 +93,7 @@ const EquipmentList = () => {
 			<SearchBar value={searchQuery} onChangeText={setSearchQuery} placeholder={i18n.t("searching")} />
 			<FlatList
 				data={filteredEquipmentList}
-				contentContainerStyle={{ alignItems: "center" }}
+				contentContainerStyle={{ alignItems: "center", paddingBottom: bottomInset }}
 				keyExtractor={(item) => item.id.toString()}
 				renderItem={({ item }) => (
 					<TouchableOpacity

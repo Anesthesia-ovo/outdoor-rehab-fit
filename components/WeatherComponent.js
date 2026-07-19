@@ -73,11 +73,13 @@ const styles = StyleSheet.create({
 		minHeight: hp("8%"),
 		justifyContent: "center",
 		alignItems: "center",
-		width: wp("90%"),
+		width: "100%",
 	},
 	outerContainer: {
-		width: wp("92%"),
+		width: "100%",
 		flexDirection: "row",
+		alignItems: "stretch",
+		gap: wp("2%"),
 		shadowColor: "#000",
 		shadowOffset: { width: 0, height: 4 },
 		shadowOpacity: 0.3,
@@ -85,9 +87,10 @@ const styles = StyleSheet.create({
 		elevation: 5,
 	},
 	container: {
-		padding: RFValue(12),
+		flex: 1,
+		minWidth: 0,
+		padding: RFValue(10),
 		borderRadius: 10,
-		marginHorizontal: wp("1%"),
 		backgroundColor: "rgba(255, 255, 255, 0.8)",
 		justifyContent: "center",
 	},
@@ -99,17 +102,19 @@ const styles = StyleSheet.create({
 	infoContainer: {
 		flexDirection: "row",
 		alignItems: "center",
+		flexShrink: 1,
 	},
 	text: {
 		fontSize: RFValue(12),
 		marginLeft: wp("1%"),
+		flexShrink: 1,
 	},
 	suggestion: {
 		fontSize: RFValue(10),
 		color: "#ff6600",
 		fontWeight: "bold",
 		textAlign: "center",
-		width: wp("40%"),
+		flexShrink: 1,
 	},
 });
 

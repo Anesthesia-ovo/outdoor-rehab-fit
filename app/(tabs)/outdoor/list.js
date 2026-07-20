@@ -7,6 +7,8 @@ import { router } from "expo-router";
 import { useNavigation } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LocaleContext } from "../../../contexts/LocaleContext";
+import { useAuth } from "../../../contexts/AuthContext";
+import { showGuestRestrictionAlert } from "../../../utils/accessControl";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { RFValue } from "react-native-responsive-fontsize";
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
@@ -15,6 +17,7 @@ const TAB_BAR_HEIGHT = 100;
 
 const EquipmentList = () => {
 	const { i18n } = useContext(LocaleContext);
+	const { isGuest } = useAuth();
 	const insets = useSafeAreaInsets();
 	const bottomInset =
 		Platform.OS === "ios" ? TAB_BAR_HEIGHT + Math.max(insets.bottom, 8) : Math.max(insets.bottom, 16);
@@ -67,6 +70,11 @@ const EquipmentList = () => {
 	}, []);
 
 	const toggleBookmark = async (itemId) => {
+		if (isGuest) {
+			showGuestRestrictionAlert(i18n);
+			return;
+		}
+
 		try {
 			let updatedBookmarks = { ...bookmarked };
 			if (updatedBookmarks[itemId]) {

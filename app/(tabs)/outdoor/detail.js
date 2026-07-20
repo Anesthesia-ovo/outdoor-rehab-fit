@@ -6,8 +6,11 @@ import { ThemedText } from "@/components/ThemedText";
 import { useNavigation } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LocaleContext } from "../../../contexts/LocaleContext";
+import { useAuth } from "../../../contexts/AuthContext";
 import YoutubePlayer from "react-native-youtube-iframe";
 import AudioPlayer from "@/components/AudioPlayer";
+import GuestBanner from "@/components/GuestBanner";
+import GuestLockedSection from "@/components/GuestLockedSection";
 import { Ionicons } from "@expo/vector-icons";
 import { enSoundFiles, zhSoundFiles, gifFiles1, gifFiles2 } from "../../../constants/Equipments";
 import { RFValue } from "react-native-responsive-fontsize";
@@ -17,6 +20,7 @@ const TAB_BAR_HEIGHT = 100;
 
 const Detail = () => {
 	const { i18n, locale } = useContext(LocaleContext);
+	const { isGuest } = useAuth();
 	const item = useLocalSearchParams();
 	const navigation = useNavigation();
 	const insets = useSafeAreaInsets();
@@ -46,6 +50,41 @@ const Detail = () => {
 		return <Text>Item not found</Text>;
 	}
 
+	const introductionSection = (
+		<View style={styles.section}>
+			<ThemedText style={styles.text}>{i18n.t("introduction")}</ThemedText>
+			<Collapsible title={i18n.t("tip1")}>
+				<ThemedText style={styles.text}>{item.kinesiologyTip}</ThemedText>
+			</Collapsible>
+			<Collapsible title={i18n.t("tip2")}>
+				<ThemedText style={styles.text}>{item.ptTip}</ThemedText>
+			</Collapsible>
+			<Collapsible title={i18n.t("tip3")}>
+				<ThemedText style={styles.text}>{item.otTip}</ThemedText>
+			</Collapsible>
+			<Collapsible title={i18n.t("tip4")}>
+				<ThemedText style={styles.text}>{item.careTip}</ThemedText>
+			</Collapsible>
+		</View>
+	);
+
+	const practiceSection = (
+		<View style={styles.section}>
+			<ThemedText style={styles.text}>{i18n.t("outdoorPractice")}</ThemedText>
+			<View style={styles.gifContainer}>
+				<TouchableOpacity style={styles.gifButton} onPress={() => openModal(gifFiles1[item.id])}>
+					<Image source={gifFiles1[item.id]} style={styles.gif} />
+				</TouchableOpacity>
+				<TouchableOpacity style={styles.gifButton} onPress={() => openModal(gifFiles2[item.id])}>
+					<Image source={gifFiles2[item.id]} style={styles.gif} />
+				</TouchableOpacity>
+			</View>
+			<Collapsible title={i18n.t("useTips")}>
+				<ThemedText style={styles.text}>{item.details}</ThemedText>
+			</Collapsible>
+		</View>
+	);
+
 	return (
 		<ScrollView contentContainerStyle={[styles.container, { paddingBottom: bottomInset }]}>
 			<Modal visible={modalVisible} transparent={true} onRequestClose={closeModal}>
@@ -59,42 +98,30 @@ const Detail = () => {
 					</View>
 				</View>
 			</Modal>
+
+			{isGuest && <GuestBanner />}
+
 			<Image source={item.horizontalPic} style={styles.image} />
-			<View style={styles.section}>
-				<ThemedText style={styles.text}>{i18n.t("introduction")}</ThemedText>
-				<Collapsible title={i18n.t("tip1")}>
-					<ThemedText style={styles.text}>{item.kinesiologyTip}</ThemedText>
-				</Collapsible>
-				<Collapsible title={i18n.t("tip2")}>
-					<ThemedText style={styles.text}>{item.ptTip}</ThemedText>
-				</Collapsible>
-				<Collapsible title={i18n.t("tip3")}>
-					<ThemedText style={styles.text}>{item.otTip}</ThemedText>
-				</Collapsible>
-				<Collapsible title={i18n.t("tip4")}>
-					<ThemedText style={styles.text}>{item.careTip}</ThemedText>
-				</Collapsible>
-			</View>
-			<View style={styles.section}>
-				<ThemedText style={styles.text}>{i18n.t("outdoorPractice")}</ThemedText>
-				<View style={styles.gifContainer}>
-					<TouchableOpacity style={styles.gifButton} onPress={() => openModal(gifFiles1[item.id])}>
-						<Image source={gifFiles1[item.id]} style={styles.gif} />
-					</TouchableOpacity>
-					<TouchableOpacity style={styles.gifButton} onPress={() => openModal(gifFiles2[item.id])}>
-						<Image source={gifFiles2[item.id]} style={styles.gif} />
-					</TouchableOpacity>
-				</View>
-				<Collapsible title={i18n.t("useTips")}>
-					<ThemedText style={styles.text}>{item.details}</ThemedText>
-				</Collapsible>
-			</View>
+
+			{isGuest ? (
+				<GuestLockedSection title={i18n.t("introduction")}>{introductionSection}</GuestLockedSection>
+			) : (
+				introductionSection
+			)}
+
+			{isGuest ? (
+				<GuestLockedSection title={i18n.t("outdoorPractice")}>{practiceSection}</GuestLockedSection>
+			) : (
+				practiceSection
+			)}
+
 			<View style={styles.section}>
 				<ThemedText style={styles.text}>{i18n.t("audioTitle")}</ThemedText>
 				<View style={styles.section}>
 					<AudioPlayer audioFile={soundFile[item.id]} />
 				</View>
 			</View>
+
 			<View style={styles.section}>
 				<ThemedText style={styles.text}>{i18n.t("reminderAndTips")}</ThemedText>
 				<YoutubePlayer height={hp("35%")} play={false} videoId={item.youtubeKey} />
@@ -106,15 +133,6 @@ const Detail = () => {
 const styles = StyleSheet.create({
 	container: {
 		marginBottom: RFValue(16),
-	},
-	titleContainer: {
-		flexDirection: "row",
-		alignItems: "center",
-		gap: 8,
-	},
-	stepContainer: {
-		gap: 8,
-		marginBottom: 8,
 	},
 	section: {
 		padding: wp("5%"),
@@ -141,8 +159,8 @@ const styles = StyleSheet.create({
 		width: "40%",
 	},
 	gif: {
-		width: "100%", // Adjust the width as needed
-		height: hp("40%"), // Adjust the height as needed
+		width: "100%",
+		height: hp("40%"),
 		resizeMode: "cover",
 	},
 	modalContainer: {

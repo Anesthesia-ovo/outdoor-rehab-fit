@@ -5,12 +5,15 @@ import { useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { LocaleContext } from "../../contexts/LocaleContext";
+import { useAuth } from "../../contexts/AuthContext";
 import { router } from "expo-router";
+import { RFValue } from "react-native-responsive-fontsize";
 
 const TAB_BAR_HEIGHT = 100;
 
 const Favourite = () => {
-	const { i18n, locale, changeLanguage } = useContext(LocaleContext);
+	const { i18n } = useContext(LocaleContext);
+	const { isGuest } = useAuth();
 	const insets = useSafeAreaInsets();
 	const bottomInset =
 		Platform.OS === "ios" ? TAB_BAR_HEIGHT + Math.max(insets.bottom, 8) : Math.max(insets.bottom, 16);
@@ -74,7 +77,20 @@ const Favourite = () => {
 
 	return (
 		<View style={styles.container}>
-			<FlatList
+			{isGuest ? (
+				<View style={styles.restrictedContainer}>
+					<Ionicons name="lock-closed" size={60} color="#840B1C" />
+					<Text style={styles.restrictedTitle}>{i18n.t("guestRestrictedTitle")}</Text>
+					<Text style={styles.restrictedText}>{i18n.t("guestRestrictedMessage")}</Text>
+					<TouchableOpacity
+						style={styles.loginButton}
+						onPress={() => router.push({ pathname: "/login", params: { from: "settings" } })}
+					>
+						<Text style={styles.loginButtonText}>{i18n.t("loginNow")}</Text>
+					</TouchableOpacity>
+				</View>
+			) : (
+				<FlatList
 				data={bookmarkedItems}
 				contentContainerStyle={{ paddingTop: 16, paddingBottom: bottomInset }}
 				keyExtractor={(item) => item.id.toString()}
@@ -104,6 +120,7 @@ const Favourite = () => {
 					</View>
 				)}
 			/>
+			)}
 		</View>
 	);
 };
@@ -195,6 +212,38 @@ const styles = StyleSheet.create({
 		marginTop: 16,
 		fontSize: 18,
 		color: "gray",
+	},
+	restrictedContainer: {
+		flex: 1,
+		justifyContent: "center",
+		alignItems: "center",
+		paddingHorizontal: 32,
+	},
+	restrictedTitle: {
+		marginTop: 20,
+		fontSize: RFValue(20),
+		fontWeight: "bold",
+		color: "#333",
+		textAlign: "center",
+	},
+	restrictedText: {
+		marginTop: 12,
+		fontSize: RFValue(14),
+		color: "#666",
+		textAlign: "center",
+		lineHeight: RFValue(22),
+	},
+	loginButton: {
+		marginTop: 24,
+		backgroundColor: "#840B1C",
+		borderRadius: 24,
+		paddingHorizontal: 28,
+		paddingVertical: 12,
+	},
+	loginButtonText: {
+		color: "#fff",
+		fontSize: RFValue(16),
+		fontWeight: "bold",
 	},
 });
 

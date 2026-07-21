@@ -1,8 +1,8 @@
 import React, { useContext, useEffect } from "react";
 import { StyleSheet, View, ScrollView, Text, TouchableOpacity, SafeAreaView, Alert } from "react-native";
 import { LocaleContext } from "../contexts/LocaleContext";
-import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { enterMainApp } from "../utils/navigation";
 
 const FirstSafety = () => {
 	const { i18n } = useContext(LocaleContext);
@@ -12,7 +12,7 @@ const FirstSafety = () => {
 			try {
 				const safetyResponse = await AsyncStorage.getItem("safetyResponse");
 				if (safetyResponse === "no") {
-					router.replace("/(tabs)");
+					enterMainApp("/(tabs)");
 				}
 			} catch (error) {
 				console.error("Error checking safety response status", error);
@@ -24,7 +24,7 @@ const FirstSafety = () => {
 	const handleNo = async () => {
 		try {
 			await AsyncStorage.setItem("safetyResponse", "no");
-			Alert.alert("", i18n.t("agreeQuestionnaire"), [{ text: "OK", onPress: () => router.replace("/(tabs)") }]);
+			Alert.alert("", i18n.t("agreeQuestionnaire"), [{ text: "OK", onPress: () => enterMainApp("/(tabs)") }]);
 		} catch (error) {
 			console.error("Error saving safety response status", error);
 		}

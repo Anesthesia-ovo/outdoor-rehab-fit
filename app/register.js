@@ -19,6 +19,7 @@ import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-nat
 import { LocaleContext } from "../contexts/LocaleContext";
 import { useAuth } from "../contexts/AuthContext";
 import { USER_PROFILE_ROLES } from "../constants/auth";
+import { navigateAfterAuth } from "../utils/onboarding";
 
 const ERROR_MESSAGES = {
 	registerRequired: "registerRequired",
@@ -64,13 +65,7 @@ export default function RegisterScreen() {
 		Alert.alert("", i18n.t("registerSuccess"), [
 			{
 				text: "OK",
-				onPress: () => {
-					if (from === "settings") {
-						router.replace("/(tabs)/setting");
-						return;
-					}
-					router.replace("/(tabs)");
-				},
+				onPress: () => navigateAfterAuth(from),
 			},
 		]);
 	};

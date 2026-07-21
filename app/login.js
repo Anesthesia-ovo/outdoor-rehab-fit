@@ -13,12 +13,12 @@ import {
 	TouchableOpacity,
 	View,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
 import { RFValue } from "react-native-responsive-fontsize";
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
 import { LocaleContext } from "../contexts/LocaleContext";
 import { useAuth } from "../contexts/AuthContext";
+import { navigateAfterAuth } from "../utils/onboarding";
 
 const ERROR_MESSAGES = {
 	loginRequired: "loginRequired",
@@ -27,30 +27,6 @@ const ERROR_MESSAGES = {
 	invalidEmail: "invalidEmail",
 	emailNotRegistered: "emailNotRegistered",
 };
-
-async function navigateAfterAuth(from) {
-	if (from === "settings") {
-		router.replace("/(tabs)/setting");
-		return;
-	}
-
-	const [userAgreed, safetyResponse] = await Promise.all([
-		AsyncStorage.getItem("userAgreed"),
-		AsyncStorage.getItem("safetyResponse"),
-	]);
-
-	if (userAgreed && safetyResponse === "no") {
-		router.replace("/(tabs)");
-		return;
-	}
-
-	if (userAgreed) {
-		router.replace("/firstquestionnaire");
-		return;
-	}
-
-	router.replace("/firstdisclaimer");
-}
 
 export default function LoginScreen() {
 	const { i18n } = useContext(LocaleContext);
@@ -146,6 +122,13 @@ export default function LoginScreen() {
 								placeholder={i18n.t("passwordPlaceholder")}
 								placeholderTextColor="#999"
 							/>
+
+							<TouchableOpacity
+								style={styles.forgotPasswordButton}
+								onPress={() => router.push({ pathname: "/forgot-password", params: { from } })}
+							>
+								<Text style={styles.forgotPasswordText}>{i18n.t("forgotPassword")}</Text>
+							</TouchableOpacity>
 
 							<TouchableOpacity
 								style={[styles.primaryButton, submitting && styles.buttonDisabled]}
@@ -254,6 +237,16 @@ const styles = StyleSheet.create({
 		marginBottom: hp("2%"),
 		backgroundColor: "#fff",
 		color: "#333",
+	},
+	forgotPasswordButton: {
+		alignSelf: "flex-end",
+		marginTop: -hp("1%"),
+		marginBottom: hp("1.5%"),
+	},
+	forgotPasswordText: {
+		fontSize: RFValue(13),
+		color: "#840B1C",
+		fontWeight: "600",
 	},
 	primaryButton: {
 		backgroundColor: "#840B1C",

@@ -1,13 +1,13 @@
 import React from "react";
-import { View, TouchableOpacity, StyleSheet, Text } from "react-native";
+import { TouchableOpacity, StyleSheet, Text } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { router } from "expo-router";
+import { goBackOrHome } from "../utils/navigation";
 
 const CustomBackButton = ({ text }) => {
 	return (
-		<TouchableOpacity style={styles.button} onPress={() => router.back()}>
+		<TouchableOpacity style={styles.button} onPress={goBackOrHome}>
 			<Ionicons name="chevron-back" size={30} color="black" />
-			<Text style={styles.text}>{text}</Text>
+			{!!text && <Text style={styles.text}>{text}</Text>}
 		</TouchableOpacity>
 	);
 };

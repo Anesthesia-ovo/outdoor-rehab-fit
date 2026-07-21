@@ -30,14 +30,28 @@ export default function RootLayout() {
 		<LocaleProvider>
 			<AuthProvider>
 				<ThemeProvider value={DefaultTheme}>
-					<Stack>
-						<Stack.Screen name="index" options={{ headerShown: false, headerTitle: "Home" }} />
-						<Stack.Screen name="login" options={{ headerShown: false }} />
+					<Stack
+						screenOptions={{
+							gestureEnabled: true,
+							fullScreenGestureEnabled: true,
+							animation: "slide_from_right",
+						}}
+					>
+						<Stack.Screen
+							name="index"
+							options={{ headerShown: false, headerTitle: "Home", gestureEnabled: false }}
+						/>
+						<Stack.Screen name="login" options={{ headerShown: false, gestureEnabled: false }} />
 						<Stack.Screen name="register" options={{ headerShown: false }} />
-						<Stack.Screen name="(tabs)" options={{ headerShown: false, headerTitle: "Home" }} />
-						<Stack.Screen name="firstdisclaimer" options={{ headerShown: false }} />
-						<Stack.Screen name="firstsafety" options={{ headerShown: false }} />
-						<Stack.Screen name="firstquestionnaire" options={{ title: "PAR-Q" }} />
+						<Stack.Screen name="forgot-password" options={{ headerShown: false }} />
+						{/* Prevent swipe-back from main app to Start/Login cover */}
+						<Stack.Screen
+							name="(tabs)"
+							options={{ headerShown: false, headerTitle: "Home", gestureEnabled: false }}
+						/>
+						<Stack.Screen name="firstdisclaimer" options={{ headerShown: false, gestureEnabled: false }} />
+						<Stack.Screen name="firstsafety" options={{ headerShown: false, gestureEnabled: false }} />
+						<Stack.Screen name="firstquestionnaire" options={{ title: "PAR-Q", gestureEnabled: false }} />
 						<Stack.Screen name="+not-found" />
 					</Stack>
 					<StatusBar style="auto" />

@@ -1,5 +1,7 @@
 export const AUTH_STORAGE_KEY = "authSession";
 export const REGISTERED_USERS_KEY = "registeredUsers";
+export const PRESET_PASSWORD_KEY = "presetPasswordOverride";
+export const RESET_CODE_KEY = "passwordResetCode";
 
 export const AUTH_ROLES = {
 	USER: "user",
@@ -19,6 +21,10 @@ export const PRESET_USER = {
 	password: "outdoor2026",
 	role: USER_PROFILE_ROLES.PARTICIPANT,
 };
+
+/** Offline demo verification code shown in the UI after "sending". */
+export const DEMO_VERIFICATION_CODE = "123456";
+export const RESET_CODE_TTL_MS = 10 * 60 * 1000;
 
 export const MIN_PASSWORD_LENGTH = 6;
 
@@ -46,6 +52,11 @@ export function isEmailLogin(identifier) {
 export async function getRegisteredUsers(storage) {
 	const data = await storage.getItem(REGISTERED_USERS_KEY);
 	return data ? JSON.parse(data) : [];
+}
+
+async function getPresetPassword(storage) {
+	const override = await storage.getItem(PRESET_PASSWORD_KEY);
+	return override || PRESET_USER.password;
 }
 
 function buildUserRecord({ name, phone, email, role, password }) {
@@ -87,7 +98,7 @@ export async function saveRegisteredUser(storage, userInput) {
 	return { success: true, user };
 }
 
-function matchesPresetUser(user) {
+function matchesPresetUser() {
 	return {
 		name: PRESET_USER.name,
 		phone: PRESET_USER.phone,
@@ -105,6 +116,126 @@ function toSessionUser(user) {
 	};
 }
 
+export async function findAccountByIdentifier(storage, identifier) {
+	const trimmedIdentifier = identifier.trim();
+	if (!trimmedIdentifier) {
+		return null;
+	}
+
+	const users = await getRegisteredUsers(storage);
+
+	if (isEmailLogin(trimmedIdentifier)) {
+		const email = normalizeEmail(trimmedIdentifier);
+		if (!isValidEmail(email)) {
+			return { error: "invalidEmail" };
+		}
+
+		if (email === PRESET_USER.email) {
+			return { type: "preset", channel: "email", target: email, user: matchesPresetUser() };
+		}
+
+		const matchedUser = users.find((user) => user.email === email);
+		if (matchedUser) {
+			return { type: "registered", channel: "email", target: email, user: matchedUser };
+		}
+
+		return { error: "accountNotFound" };
+	}
+
+	if (!isValidPhone(trimmedIdentifier)) {
+		return { error: "invalidPhone" };
+	}
+
+	const phone = normalizePhone(trimmedIdentifier);
+	if (phone === PRESET_USER.phone) {
+		return { type: "preset", channel: "phone", target: phone, user: matchesPresetUser() };
+	}
+
+	const matchedUser = users.find((user) => user.phone === phone);
+	if (matchedUser) {
+		return { type: "registered", channel: "phone", target: phone, user: matchedUser };
+	}
+
+	return { error: "accountNotFound" };
+}
+
+export async function sendDemoVerificationCode(storage, identifier) {
+	const account = await findAccountByIdentifier(storage, identifier);
+	if (!account || account.error) {
+		return { success: false, error: account?.error || "accountNotFound" };
+	}
+
+	const payload = {
+		code: DEMO_VERIFICATION_CODE,
+		identifier: account.target,
+		channel: account.channel,
+		type: account.type,
+		expiresAt: Date.now() + RESET_CODE_TTL_MS,
+	};
+
+	await storage.setItem(RESET_CODE_KEY, JSON.stringify(payload));
+
+	return {
+		success: true,
+		demoCode: DEMO_VERIFICATION_CODE,
+		channel: account.channel,
+		target: account.target,
+	};
+}
+
+export async function resetPasswordWithCode(storage, identifier, code, newPassword, confirmPassword) {
+	if (!identifier?.trim() || !code?.trim() || !newPassword || !confirmPassword) {
+		return { success: false, error: "resetRequired" };
+	}
+
+	if (newPassword.length < MIN_PASSWORD_LENGTH) {
+		return { success: false, error: "passwordTooShort" };
+	}
+
+	if (newPassword !== confirmPassword) {
+		return { success: false, error: "passwordMismatch" };
+	}
+
+	const account = await findAccountByIdentifier(storage, identifier);
+	if (!account || account.error) {
+		return { success: false, error: account?.error || "accountNotFound" };
+	}
+
+	const stored = await storage.getItem(RESET_CODE_KEY);
+	if (!stored) {
+		return { success: false, error: "codeExpired" };
+	}
+
+	const payload = JSON.parse(stored);
+	if (Date.now() > payload.expiresAt) {
+		await storage.removeItem(RESET_CODE_KEY);
+		return { success: false, error: "codeExpired" };
+	}
+
+	if (payload.identifier !== account.target || payload.code !== code.trim()) {
+		return { success: false, error: "invalidCode" };
+	}
+
+	if (account.type === "preset") {
+		await storage.setItem(PRESET_PASSWORD_KEY, newPassword);
+	} else {
+		const users = await getRegisteredUsers(storage);
+		const updatedUsers = users.map((user) => {
+			if (account.channel === "email" && user.email === account.target) {
+				return { ...user, password: newPassword };
+			}
+			if (account.channel === "phone" && user.phone === account.target) {
+				return { ...user, password: newPassword };
+			}
+			return user;
+		});
+		await storage.setItem(REGISTERED_USERS_KEY, JSON.stringify(updatedUsers));
+	}
+
+	await storage.removeItem(RESET_CODE_KEY);
+	return { success: true };
+}
+
 export async function validateCredentials(storage, identifier, password) {
 	const trimmedIdentifier = identifier.trim();
 
@@ -113,6 +244,7 @@ export async function validateCredentials(storage, identifier, password) {
 	}
 
 	const loginByEmail = isEmailLogin(trimmedIdentifier);
+	const presetPassword = await getPresetPassword(storage);
 
 	if (loginByEmail) {
 		const email = normalizeEmail(trimmedIdentifier);
@@ -120,8 +252,8 @@ export async function validateCredentials(storage, identifier, password) {
 			return { valid: false, error: "invalidEmail" };
 		}
 
-		if (email === PRESET_USER.email && password === PRESET_USER.password) {
-			return { valid: true, user: matchesPresetUser(PRESET_USER) };
+		if (email === PRESET_USER.email && password === presetPassword) {
+			return { valid: true, user: matchesPresetUser() };
 		}
 
 		const users = await getRegisteredUsers(storage);
@@ -145,8 +277,8 @@ export async function validateCredentials(storage, identifier, password) {
 		return { valid: false, error: "invalidPhone" };
 	}
 
-	if (phone === PRESET_USER.phone && password === PRESET_USER.password) {
-		return { valid: true, user: matchesPresetUser(PRESET_USER) };
+	if (phone === PRESET_USER.phone && password === presetPassword) {
+		return { valid: true, user: matchesPresetUser() };
 	}
 
 	const users = await getRegisteredUsers(storage);

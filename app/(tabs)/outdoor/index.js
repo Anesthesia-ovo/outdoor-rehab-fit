@@ -2,7 +2,6 @@ import React, { useContext } from "react";
 import { router } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Platform, StyleSheet, View, Text, TouchableOpacity, Image, ScrollView } from "react-native";
-import CustomBackButton from "../../../components/CustomBackButton";
 import { LocaleContext } from "../../../contexts/LocaleContext";
 import { widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { RFValue } from "react-native-responsive-fontsize";
@@ -29,8 +28,7 @@ export default function Outdoor() {
 	];
 
 	return (
-		<SafeAreaView style={styles.container}>
-			<CustomBackButton text={i18n.t("back")} />
+		<SafeAreaView style={styles.container} edges={["bottom"]}>
 			<ScrollView contentContainerStyle={[styles.scrollViewContent, { paddingBottom: bottomInset }]}>
 				<View style={styles.buttonsContainer}>
 					{buttons.map((button, index) => (

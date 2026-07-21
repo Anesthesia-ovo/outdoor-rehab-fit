@@ -11,10 +11,11 @@ import { LocaleContext } from "../../contexts/LocaleContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { FEATURES } from "../../constants/permissions";
 import { guardGuestAccess } from "../../utils/accessControl";
-import { Tabs, router } from "expo-router";
+import { Tabs } from "expo-router";
+import { goBackOrHome } from "../../utils/navigation";
 
 const renderBackButton = () => (
-	<TouchableOpacity onPress={() => router.back()}>
+	<TouchableOpacity onPress={goBackOrHome}>
 		<Ionicons name="chevron-back" size={RFValue(18)} color={"#000"} />
 	</TouchableOpacity>
 );
@@ -89,6 +90,7 @@ export default function TabLayout() {
 			<Tabs.Screen name="outdoor" options={{ href: null }} />
 			<Tabs.Screen name="location" options={{ href: null }} />
 			<Tabs.Screen name="research" options={{ href: null }} />
+			<Tabs.Screen name="session" options={{ href: null }} />
 		</Tabs>
 	);
 }

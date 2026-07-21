@@ -26,6 +26,7 @@ export default function HomeScreen() {
 			icon: require("@/assets/icons/outdoor.png"),
 			route: "outdoor",
 			feature: FEATURES.OUTDOOR_EQUIPMENT,
+			kind: "image",
 		},
 		{
 			color: "#E8CCB0",
@@ -33,6 +34,7 @@ export default function HomeScreen() {
 			icon: require("@/assets/icons/risks.png"),
 			route: "(tabs)/risk",
 			feature: FEATURES.RISK,
+			kind: "image",
 		},
 		{
 			color: "#F2CCC0",
@@ -40,6 +42,7 @@ export default function HomeScreen() {
 			icon: require("@/assets/icons/map.png"),
 			route: "(tabs)/location",
 			feature: FEATURES.LOCATION,
+			kind: "image",
 		},
 		{
 			color: "#ECDD93",
@@ -47,6 +50,15 @@ export default function HomeScreen() {
 			icon: require("@/assets/icons/school.png"),
 			route: "research",
 			feature: FEATURES.RESEARCH,
+			kind: "image",
+		},
+		{
+			color: "#840B1C",
+			text: i18n.t("sessionHub"),
+			ionicon: "fitness",
+			route: "session",
+			feature: FEATURES.SESSION_RECORD,
+			kind: "ion",
 		},
 	];
 
@@ -92,7 +104,11 @@ export default function HomeScreen() {
 									onPress={() => handlePress(button)}
 									style={[styles.button, { backgroundColor: button.color }, isLocked && styles.lockedButton]}
 								>
-									<Image source={button.icon} style={[styles.icon, isLocked && styles.lockedIcon]} />
+									{button.kind === "ion" ? (
+										<Ionicons name={button.ionicon} size={RFValue(36)} color="#fff" />
+									) : (
+										<Image source={button.icon} style={[styles.icon, isLocked && styles.lockedIcon]} />
+									)}
 									{isLocked && (
 										<View style={styles.lockBadge}>
 											<Ionicons name="lock-closed" size={RFValue(14)} color="#fff" />

@@ -11,7 +11,7 @@ const stackScreenOptions = {
 	headerBackTitleVisible: false,
 };
 
-export default function RiskLayout() {
+export default function SessionLayout() {
 	const { i18n } = useContext(LocaleContext);
 
 	return (
@@ -19,14 +19,17 @@ export default function RiskLayout() {
 			<Stack.Screen
 				name="index"
 				options={{
-					title: i18n.t("risk"),
+					title: i18n.t("sessionHubTitle"),
 					headerLeft: () => <HeaderBackButton />,
+					// Root of this stack: disable swipe so it won't pop out to Start cover
 					gestureEnabled: false,
 					fullScreenGestureEnabled: false,
 				}}
 			/>
-			<Stack.Screen name="questionnaire" options={{ title: i18n.t("parq") }} />
-			<Stack.Screen name="safety" options={{ title: i18n.t("sprm") }} />
+			<Stack.Screen name="timer" options={{ title: i18n.t("sessionTimerTitle") }} />
+			<Stack.Screen name="summary" options={{ title: i18n.t("sessionSummaryTitle") }} />
+			<Stack.Screen name="log" options={{ title: i18n.t("sessionLog") }} />
+			<Stack.Screen name="detail" options={{ title: i18n.t("sessionDetailTitle") }} />
 		</Stack>
 	);
 }

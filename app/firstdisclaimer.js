@@ -1,45 +1,29 @@
-import React, { useContext, useEffect, useState } from "react";
-import { StyleSheet, View, ScrollView, Text, TouchableOpacity, SafeAreaView, ActivityIndicator, Alert } from "react-native";
+import React, { useContext } from "react";
+import { StyleSheet, View, ScrollView, Text, TouchableOpacity, SafeAreaView, Alert } from "react-native";
 import { LocaleContext } from "../contexts/LocaleContext";
-import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { router } from "expo-router";
+import { enterMainApp } from "../utils/navigation";
 
 const FirstDisclaimer = () => {
 	const { i18n } = useContext(LocaleContext);
-	const [loading, setLoading] = useState(false);
-	useEffect(() => {
-		const checkAgreement = async () => {
-			try {
-				const agreed = await AsyncStorage.getItem("userAgreed");
-				if (agreed) {
-					router.replace("/(tabs)");
-				} else {
-					setLoading(false);
-				}
-			} catch (error) {
-				console.error("Error checking agreement status", error);
-				setLoading(false);
-			}
-		};
-		checkAgreement();
-	}, []);
 
 	const handleAgree = async () => {
 		try {
 			await AsyncStorage.setItem("userAgreed", "true");
+			const safetyResponse = await AsyncStorage.getItem("safetyResponse");
+
+			// Already finished safety before — go home after re-confirming disclaimer.
+			if (safetyResponse === "no") {
+				enterMainApp("/(tabs)");
+				return;
+			}
+
 			router.replace("/firstquestionnaire");
 		} catch (error) {
 			console.error("Error saving agreement status", error);
 		}
 	};
-
-	if (loading) {
-		return (
-			<SafeAreaView style={styles.container}>
-				<ActivityIndicator size="large" color="#0000ff" />
-			</SafeAreaView>
-		);
-	}
 
 	return (
 		<SafeAreaView style={styles.container}>

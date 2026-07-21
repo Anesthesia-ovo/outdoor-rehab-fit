@@ -1,11 +1,12 @@
-import React, { useContext, useEffect, useState } from "react";
-import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useContext, useEffect, useMemo, useState } from "react";
+import { Alert, Image, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { RFValue } from "react-native-responsive-fontsize";
-import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
+import { widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { LocaleContext } from "../../../contexts/LocaleContext";
 import { useAuth } from "../../../contexts/AuthContext";
+import { ACTIVITY_TYPE_ICONS, getEquipmentIcon } from "../../../utils/equipmentImages";
 import {
 	deleteSession,
 	formatDateTime,
@@ -24,6 +25,7 @@ export default function SessionDetailScreen() {
 	const bottomInset =
 		Platform.OS === "ios" ? TAB_BAR_HEIGHT + Math.max(insets.bottom, 8) : Math.max(insets.bottom, 16);
 	const [session, setSession] = useState(null);
+	const equipmentList = i18n.t("equipmentList", { returnObjects: true }) || [];
 
 	useEffect(() => {
 		navigation.setOptions({ headerTitle: i18n.t("sessionDetailTitle") });
@@ -41,6 +43,30 @@ export default function SessionDetailScreen() {
 		};
 		load();
 	}, [id, isGuest]);
+
+	const activityItems = useMemo(
+		() => [
+			{
+				key: "aerobic",
+				label: i18n.t("doneAerobic"),
+				done: !!session?.doneAerobic,
+				icon: ACTIVITY_TYPE_ICONS.aerobic,
+			},
+			{
+				key: "balance",
+				label: i18n.t("doneBalance"),
+				done: !!session?.doneBalance,
+				icon: ACTIVITY_TYPE_ICONS.balance,
+			},
+			{
+				key: "strength",
+				label: i18n.t("doneStrength"),
+				done: !!session?.doneStrength,
+				icon: ACTIVITY_TYPE_ICONS.strength,
+			},
+		],
+		[i18n, session]
+	);
 
 	const handleDelete = () => {
 		Alert.alert(i18n.t("deleteSession"), i18n.t("deleteSessionConfirm"), [
@@ -63,6 +89,8 @@ export default function SessionDetailScreen() {
 			</View>
 		);
 	}
+
+	const isOutdoor = session.sessionType !== "home";
 
 	return (
 		<ScrollView contentContainerStyle={[styles.container, { paddingBottom: bottomInset + 20 }]}>
@@ -88,32 +116,39 @@ export default function SessionDetailScreen() {
 				</View>
 			)}
 
-			<View style={styles.card}>
-				<Text style={styles.sectionTitle}>{i18n.t("exerciseRecords")}</Text>
-				{(session.exercises || []).length === 0 ? (
-					<Text style={styles.body}>{i18n.t("noneSelected")}</Text>
-				) : (
-					session.exercises.map((item, index) => (
-						<View key={`${item.equipmentId}_${index}`} style={styles.exerciseRow}>
-							<Text style={styles.exerciseName}>{item.name}</Text>
-							<Text style={styles.exerciseReps}>
-								{i18n.t("reps")}: {item.reps ?? "-"}
-							</Text>
-						</View>
-					))
-				)}
-			</View>
+			{isOutdoor && (
+				<View style={styles.card}>
+					<Text style={styles.sectionTitle}>{i18n.t("exerciseRecords")}</Text>
+					{(session.exercises || []).length === 0 ? (
+						<Text style={styles.body}>{i18n.t("noneSelected")}</Text>
+					) : (
+						session.exercises.map((item, index) => {
+							const iconSource = getEquipmentIcon(equipmentList, item.equipmentId);
+							return (
+								<View key={`${item.equipmentId}_${index}`} style={styles.exerciseRow}>
+									{iconSource ? <Image source={iconSource} style={styles.exerciseThumb} /> : null}
+									<View style={styles.exerciseInfo}>
+										<Text style={styles.exerciseName}>{item.name}</Text>
+										<Text style={styles.exerciseReps}>
+											{i18n.t("reps")}: {item.reps ?? "-"}
+										</Text>
+									</View>
+								</View>
+							);
+						})
+					)}
+				</View>
+			)}
 
 			<View style={styles.card}>
-				<Text style={styles.body}>
-					{i18n.t("doneAerobic")}: {session.doneAerobic ? "✓" : "—"}
-				</Text>
-				<Text style={styles.body}>
-					{i18n.t("doneBalance")}: {session.doneBalance ? "✓" : "—"}
-				</Text>
-				<Text style={styles.body}>
-					{i18n.t("doneStrength")}: {session.doneStrength ? "✓" : "—"}
-				</Text>
+				<Text style={styles.sectionTitle}>{i18n.t("activityTypesDone")}</Text>
+				{activityItems.map((item) => (
+					<View key={item.key} style={styles.activityRow}>
+						<Image source={item.icon} style={styles.activityIcon} />
+						<Text style={styles.activityLabel}>{item.label}</Text>
+						<Text style={styles.activityStatus}>{item.done ? "✓" : "—"}</Text>
+					</View>
+				))}
 			</View>
 
 			<TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
@@ -166,9 +201,21 @@ const styles = StyleSheet.create({
 		marginBottom: 4,
 	},
 	exerciseRow: {
-		paddingVertical: 8,
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 12,
+		paddingVertical: 10,
 		borderBottomWidth: 1,
 		borderBottomColor: "#f0f0f0",
+	},
+	exerciseThumb: {
+		width: 64,
+		height: 64,
+		borderRadius: 10,
+		backgroundColor: "#f0f0f0",
+	},
+	exerciseInfo: {
+		flex: 1,
 	},
 	exerciseName: {
 		fontSize: RFValue(14),
@@ -176,9 +223,34 @@ const styles = StyleSheet.create({
 		color: "#333",
 	},
 	exerciseReps: {
-		marginTop: 2,
+		marginTop: 4,
 		fontSize: RFValue(13),
 		color: "#666",
+	},
+	activityRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 10,
+		paddingVertical: 10,
+		borderBottomWidth: 1,
+		borderBottomColor: "#f5f5f5",
+	},
+	activityIcon: {
+		width: 36,
+		height: 36,
+		resizeMode: "contain",
+	},
+	activityLabel: {
+		flex: 1,
+		fontSize: RFValue(14),
+		color: "#333",
+	},
+	activityStatus: {
+		fontSize: RFValue(16),
+		fontWeight: "bold",
+		color: "#840B1C",
+		minWidth: 24,
+		textAlign: "center",
 	},
 	deleteButton: {
 		marginTop: 8,

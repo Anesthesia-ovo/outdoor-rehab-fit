@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useMemo, useState } from "react";
 import {
 	Alert,
+	Image,
 	Modal,
 	Platform,
 	ScrollView,
@@ -18,6 +19,9 @@ import { RFValue } from "react-native-responsive-fontsize";
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
 import { LocaleContext } from "../../../contexts/LocaleContext";
 import { useAuth } from "../../../contexts/AuthContext";
+import WeeklyGoalProgress from "../../../components/WeeklyGoalProgress";
+import { getWeeklyProgress } from "../../../utils/goalStorage";
+import { ACTIVITY_TYPE_ICONS, getEquipmentIcon } from "../../../utils/equipmentImages";
 import {
 	createSessionId,
 	formatDateTime,
@@ -53,6 +57,7 @@ export default function SessionSummaryScreen() {
 	const [doneStrength, setDoneStrength] = useState(false);
 	const [pickerVisible, setPickerVisible] = useState(false);
 	const [saving, setSaving] = useState(false);
+	const [weeklyProgress, setWeeklyProgress] = useState(null);
 
 	useEffect(() => {
 		navigation.setOptions({ headerTitle: i18n.t("sessionSummaryTitle") });
@@ -61,8 +66,14 @@ export default function SessionSummaryScreen() {
 	useEffect(() => {
 		if (isGuest) {
 			router.replace("/(tabs)");
+			return;
 		}
-	}, [isGuest]);
+		const load = async () => {
+			const progress = await getWeeklyProgress(getOwnerKey(user));
+			setWeeklyProgress(progress);
+		};
+		load();
+	}, [isGuest, user]);
 
 	const syncCheckboxesFromExercises = (nextExercises) => {
 		const categories = nextExercises.flatMap((item) => item.categories || []);
@@ -139,9 +150,27 @@ export default function SessionSummaryScreen() {
 
 	const checkboxItems = useMemo(
 		() => [
-			{ key: "aerobic", label: i18n.t("doneAerobic"), value: doneAerobic, setter: setDoneAerobic },
-			{ key: "balance", label: i18n.t("doneBalance"), value: doneBalance, setter: setDoneBalance },
-			{ key: "strength", label: i18n.t("doneStrength"), value: doneStrength, setter: setDoneStrength },
+			{
+				key: "aerobic",
+				label: i18n.t("doneAerobic"),
+				value: doneAerobic,
+				setter: setDoneAerobic,
+				icon: ACTIVITY_TYPE_ICONS.aerobic,
+			},
+			{
+				key: "balance",
+				label: i18n.t("doneBalance"),
+				value: doneBalance,
+				setter: setDoneBalance,
+				icon: ACTIVITY_TYPE_ICONS.balance,
+			},
+			{
+				key: "strength",
+				label: i18n.t("doneStrength"),
+				value: doneStrength,
+				setter: setDoneStrength,
+				icon: ACTIVITY_TYPE_ICONS.strength,
+			},
 		],
 		[doneAerobic, doneBalance, doneStrength, i18n]
 	);
@@ -196,14 +225,13 @@ export default function SessionSummaryScreen() {
 					/>
 				</View>
 
-				<View style={styles.card}>
-					<Text style={styles.sectionTitle}>{i18n.t("goalProgressPlaceholder")}</Text>
-					<View style={styles.progressPlaceholder}>
-						<View style={styles.progressBar} />
-						<View style={[styles.progressBar, { width: "40%" }]} />
-						<View style={[styles.progressBar, { width: "25%" }]} />
+				{weeklyProgress ? (
+					<WeeklyGoalProgress progress={weeklyProgress} showCalendar={false} compact />
+				) : (
+					<View style={styles.card}>
+						<Text style={styles.sectionTitle}>{i18n.t("goalProgressTitle")}</Text>
 					</View>
-				</View>
+				)}
 
 				<TouchableOpacity style={styles.showMoreButton} onPress={() => setShowMore((value) => !value)}>
 					<Text style={styles.showMoreText}>{showMore ? i18n.t("hideMore") : i18n.t("showMore")}</Text>
@@ -226,24 +254,28 @@ export default function SessionSummaryScreen() {
 
 						<View style={styles.card}>
 							<Text style={styles.sectionTitle}>{i18n.t("exerciseRecords")}</Text>
-							{exercises.map((item) => (
-								<View key={item.id} style={styles.exerciseRow}>
-									<View style={styles.exerciseInfo}>
-										<Text style={styles.exerciseName}>{item.name}</Text>
-										<TextInput
-											style={styles.repsInput}
-											value={item.reps}
-											onChangeText={(text) => updateReps(item.id, text.replace(/[^0-9]/g, ""))}
-											keyboardType="number-pad"
-											placeholder={i18n.t("repsPlaceholder")}
-											placeholderTextColor="#999"
-										/>
+							{exercises.map((item) => {
+								const iconSource = getEquipmentIcon(equipmentList, item.equipmentId);
+								return (
+									<View key={item.id} style={styles.exerciseRow}>
+										{iconSource ? <Image source={iconSource} style={styles.exerciseThumb} /> : null}
+										<View style={styles.exerciseInfo}>
+											<Text style={styles.exerciseName}>{item.name}</Text>
+											<TextInput
+												style={styles.repsInput}
+												value={item.reps}
+												onChangeText={(text) => updateReps(item.id, text.replace(/[^0-9]/g, ""))}
+												keyboardType="number-pad"
+												placeholder={i18n.t("repsPlaceholder")}
+												placeholderTextColor="#999"
+											/>
+											<TouchableOpacity onPress={() => removeExercise(item.id)}>
+												<Text style={styles.removeText}>{i18n.t("removeExercise")}</Text>
+											</TouchableOpacity>
+										</View>
 									</View>
-									<TouchableOpacity onPress={() => removeExercise(item.id)}>
-										<Text style={styles.removeText}>{i18n.t("removeExercise")}</Text>
-									</TouchableOpacity>
-								</View>
-							))}
+								);
+							})}
 							{sessionType !== "home" && (
 								<TouchableOpacity style={styles.addButton} onPress={() => setPickerVisible(true)}>
 									<Ionicons name="add-circle-outline" size={20} color="#840B1C" />
@@ -253,12 +285,14 @@ export default function SessionSummaryScreen() {
 						</View>
 
 						<View style={styles.card}>
+							<Text style={styles.sectionTitle}>{i18n.t("activityTypesDone")}</Text>
 							{checkboxItems.map((item) => (
 								<TouchableOpacity
 									key={item.key}
 									style={styles.checkboxRow}
 									onPress={() => item.setter(!item.value)}
 								>
+									<Image source={item.icon} style={styles.activityIcon} />
 									<Ionicons
 										name={item.value ? "checkbox" : "square-outline"}
 										size={24}
@@ -291,6 +325,7 @@ export default function SessionSummaryScreen() {
 					<ScrollView contentContainerStyle={styles.modalList}>
 						{equipmentList.map((item) => (
 							<TouchableOpacity key={item.id} style={styles.modalItem} onPress={() => handleAddEquipment(item)}>
+								{item.icon ? <Image source={item.icon} style={styles.modalThumb} /> : null}
 								<Text style={styles.modalItemText}>{item.name}</Text>
 							</TouchableOpacity>
 						))}
@@ -381,11 +416,21 @@ const styles = StyleSheet.create({
 		color: "#333",
 	},
 	exerciseRow: {
+		flexDirection: "row",
+		alignItems: "flex-start",
 		borderBottomWidth: 1,
 		borderBottomColor: "#eee",
-		paddingVertical: 10,
+		paddingVertical: 12,
+		gap: 12,
+	},
+	exerciseThumb: {
+		width: 64,
+		height: 64,
+		borderRadius: 10,
+		backgroundColor: "#f0f0f0",
 	},
 	exerciseInfo: {
+		flex: 1,
 		gap: 8,
 	},
 	exerciseName: {
@@ -402,7 +447,6 @@ const styles = StyleSheet.create({
 		fontSize: RFValue(14),
 	},
 	removeText: {
-		marginTop: 6,
 		color: "#840B1C",
 		fontSize: RFValue(12),
 	},
@@ -421,7 +465,12 @@ const styles = StyleSheet.create({
 		flexDirection: "row",
 		alignItems: "center",
 		gap: 10,
-		paddingVertical: 8,
+		paddingVertical: 10,
+	},
+	activityIcon: {
+		width: 36,
+		height: 36,
+		resizeMode: "contain",
 	},
 	checkboxLabel: {
 		fontSize: RFValue(14),
@@ -465,11 +514,21 @@ const styles = StyleSheet.create({
 		padding: 16,
 	},
 	modalItem: {
-		paddingVertical: 14,
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 12,
+		paddingVertical: 12,
 		borderBottomWidth: 1,
 		borderBottomColor: "#f0f0f0",
 	},
+	modalThumb: {
+		width: 52,
+		height: 52,
+		borderRadius: 8,
+		backgroundColor: "#f0f0f0",
+	},
 	modalItemText: {
+		flex: 1,
 		fontSize: RFValue(15),
 		color: "#333",
 	},

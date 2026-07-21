@@ -1,6 +1,15 @@
-import React, { useContext } from "react";
-import { Platform, StyleSheet, View, Text, TouchableOpacity, Image, ScrollView } from "react-native";
-import { router } from "expo-router";
+import React, { useCallback, useContext, useState } from "react";
+import {
+	Alert,
+	Platform,
+	StyleSheet,
+	View,
+	Text,
+	TouchableOpacity,
+	Image,
+	ScrollView,
+} from "react-native";
+import { router, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LocaleContext } from "../../contexts/LocaleContext";
@@ -9,16 +18,26 @@ import { FEATURES } from "../../constants/permissions";
 import { guardGuestAccess } from "../../utils/accessControl";
 import { RFValue } from "react-native-responsive-fontsize";
 import WeatherComponent from "../../components/WeatherComponent";
+import WeeklyGoalProgress from "../../components/WeeklyGoalProgress";
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
+import {
+	confirmGoalsForCurrentWeek,
+	getWeeklyProgress,
+	needsWeekCarryPrompt,
+	getGoalsForUser,
+} from "../../utils/goalStorage";
+import { getOwnerKey } from "../../utils/sessionStorage";
 
 const TAB_BAR_HEIGHT = 100;
 
 export default function HomeScreen() {
 	const { i18n } = useContext(LocaleContext);
-	const { isGuest } = useAuth();
+	const { user, isGuest } = useAuth();
 	const insets = useSafeAreaInsets();
 	const bottomInset =
 		Platform.OS === "ios" ? TAB_BAR_HEIGHT + Math.max(insets.bottom, 8) : Math.max(insets.bottom, 16);
+	const [weeklyProgress, setWeeklyProgress] = useState(null);
+
 	const buttons = [
 		{
 			color: "#F0E4C2",
@@ -60,7 +79,53 @@ export default function HomeScreen() {
 			feature: FEATURES.SESSION_RECORD,
 			kind: "ion",
 		},
+		{
+			color: "#2A9D8F",
+			text: i18n.t("goalSetting"),
+			ionicon: "flag",
+			route: "goals",
+			feature: FEATURES.GOAL_SETTING,
+			kind: "ion",
+		},
 	];
+
+	useFocusEffect(
+		useCallback(() => {
+			if (isGuest) {
+				setWeeklyProgress(null);
+				return;
+			}
+
+			const ownerKey = getOwnerKey(user);
+			const load = async () => {
+				const progress = await getWeeklyProgress(ownerKey);
+				setWeeklyProgress(progress);
+
+				const goals = await getGoalsForUser(ownerKey);
+				if (needsWeekCarryPrompt(goals)) {
+					Alert.alert(i18n.t("goalCarryTitle"), i18n.t("goalCarryMessage"), [
+						{
+							text: i18n.t("goalCarryEdit"),
+							style: "cancel",
+							onPress: async () => {
+								await confirmGoalsForCurrentWeek(ownerKey);
+								router.push("/goals");
+							},
+						},
+						{
+							text: i18n.t("goalCarryKeep"),
+							onPress: async () => {
+								await confirmGoalsForCurrentWeek(ownerKey);
+								const refreshed = await getWeeklyProgress(ownerKey);
+								setWeeklyProgress(refreshed);
+							},
+						},
+					]);
+				}
+			};
+			load();
+		}, [i18n, isGuest, user])
+	);
 
 	const getGreeting = () => {
 		const currentHour = new Date().getHours();
@@ -89,6 +154,9 @@ export default function HomeScreen() {
 				</View>
 			</View>
 			<View style={styles.buttonsContainer}>
+				{!isGuest && weeklyProgress && (
+					<WeeklyGoalProgress progress={weeklyProgress} showCalendar showSmartGoals />
+				)}
 				{isGuest && (
 					<View style={styles.guestNotice}>
 						<Ionicons name="lock-closed" size={RFValue(18)} color="#840B1C" style={styles.guestNoticeIcon} />
@@ -187,7 +255,7 @@ const styles = StyleSheet.create({
 		borderTopRightRadius: 20,
 		marginTop: hp("-3%"),
 		paddingTop: hp("2%"),
-		paddingHorizontal: wp("7%"),
+		paddingHorizontal: wp("5%"),
 		paddingBottom: hp("2%"),
 	},
 	buttonsGrid: {

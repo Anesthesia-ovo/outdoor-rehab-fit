@@ -91,6 +91,7 @@ export default function TabLayout() {
 			<Tabs.Screen name="location" options={{ href: null }} />
 			<Tabs.Screen name="research" options={{ href: null }} />
 			<Tabs.Screen name="session" options={{ href: null }} />
+			<Tabs.Screen name="goals" options={{ href: null }} />
 		</Tabs>
 	);
 }

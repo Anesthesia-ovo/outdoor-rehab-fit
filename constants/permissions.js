@@ -8,6 +8,7 @@ export const FEATURES = {
 	FAVORITE: "favorite",
 	BOOKMARK: "bookmark",
 	SESSION_RECORD: "session_record",
+	GOAL_SETTING: "goal_setting",
 };
 
 const GUEST_FEATURES = new Set([FEATURES.OUTDOOR_EQUIPMENT, FEATURES.OUTDOOR_AUDIO_VIDEO]);

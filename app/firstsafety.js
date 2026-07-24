@@ -1,30 +1,19 @@
-import React, { useContext, useEffect } from "react";
+import React, { useContext } from "react";
 import { StyleSheet, View, ScrollView, Text, TouchableOpacity, SafeAreaView, Alert } from "react-native";
 import { LocaleContext } from "../contexts/LocaleContext";
+import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { enterMainApp } from "../utils/navigation";
+import { showAlert } from "../utils/alert";
 
 const FirstSafety = () => {
 	const { i18n } = useContext(LocaleContext);
-
-	useEffect(() => {
-		const checkSafetyResponse = async () => {
-			try {
-				const safetyResponse = await AsyncStorage.getItem("safetyResponse");
-				if (safetyResponse === "no") {
-					enterMainApp("/(tabs)");
-				}
-			} catch (error) {
-				console.error("Error checking safety response status", error);
-			}
-		};
-		checkSafetyResponse();
-	}, []);
+	// Note: no auto-skip here; the first-launch gating is handled in app/index.js
+	// so this page is always shown during the onboarding flow.
 
 	const handleNo = async () => {
 		try {
 			await AsyncStorage.setItem("safetyResponse", "no");
-			Alert.alert("", i18n.t("agreeQuestionnaire"), [{ text: "OK", onPress: () => enterMainApp("/(tabs)") }]);
+			showAlert("", i18n.t("agreeQuestionnaire"), [{ text: "OK", onPress: () => router.replace("/login") }]);
 		} catch (error) {
 			console.error("Error saving safety response status", error);
 		}
@@ -43,7 +32,7 @@ const FirstSafety = () => {
 				<TouchableOpacity
 					style={[styles.button, { backgroundColor: "#dc3545" }]}
 					onPress={() => {
-						Alert.alert(i18n.t("warning"), i18n.t("questionnaireYes"));
+						showAlert(i18n.t("warning"), i18n.t("questionnaireYes"));
 					}}
 				>
 					<Text style={styles.buttonText}>{i18n.t("disagreeSafety")}</Text>

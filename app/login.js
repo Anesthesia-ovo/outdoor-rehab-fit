@@ -1,7 +1,6 @@
 import React, { useContext, useEffect, useState } from "react";
 import {
 	ActivityIndicator,
-	Alert,
 	ImageBackground,
 	KeyboardAvoidingView,
 	Platform,
@@ -17,6 +16,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { RFValue } from "react-native-responsive-fontsize";
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
 import { LocaleContext } from "../contexts/LocaleContext";
+import { showAlert } from "../utils/alert";
 import { useAuth } from "../contexts/AuthContext";
 import { navigateAfterAuth } from "../utils/onboarding";
 
@@ -45,7 +45,7 @@ export default function LoginScreen() {
 
 	const handleLogin = async () => {
 		if (!identifier.trim() || !password) {
-			Alert.alert(i18n.t("warning"), i18n.t("loginRequired"));
+			showAlert(i18n.t("warning"), i18n.t("loginRequired"));
 			return;
 		}
 
@@ -55,18 +55,26 @@ export default function LoginScreen() {
 
 		if (!result.success) {
 			const messageKey = ERROR_MESSAGES[result.error] || "invalidCredentials";
-			Alert.alert(i18n.t("warning"), i18n.t(messageKey));
+			showAlert(i18n.t("warning"), i18n.t(messageKey));
 			return;
 		}
 
 		await navigateAfterAuth(from);
 	};
 
-	const handleGuestLogin = async () => {
-		setSubmitting(true);
-		await loginAsGuest();
-		setSubmitting(false);
-		await navigateAfterAuth(from);
+	const handleGuestLogin = () => {
+		showAlert(i18n.t("guestConfirmTitle"), i18n.t("guestConfirmMessage"), [
+			{ text: i18n.t("cancel"), style: "cancel" },
+			{
+				text: i18n.t("stayGuest"),
+				onPress: async () => {
+					setSubmitting(true);
+					await loginAsGuest();
+					setSubmitting(false);
+					await navigateAfterAuth(from);
+				},
+			},
+		]);
 	};
 
 	if (isLoading) {

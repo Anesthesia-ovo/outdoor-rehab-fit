@@ -1,24 +1,18 @@
 import React, { useContext } from "react";
-import { StyleSheet, View, ScrollView, Text, TouchableOpacity, SafeAreaView, Alert } from "react-native";
+import { StyleSheet, View, ScrollView, Text, TouchableOpacity, SafeAreaView } from "react-native";
 import { LocaleContext } from "../contexts/LocaleContext";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-import { enterMainApp } from "../utils/navigation";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { showAlert } from "../utils/alert";
 
 const FirstDisclaimer = () => {
 	const { i18n } = useContext(LocaleContext);
+	// Note: the "already agreed -> skip to login" check now lives in app/index.js,
+	// so the disclaimer is always shown when the user taps Start on first launch.
 
 	const handleAgree = async () => {
 		try {
 			await AsyncStorage.setItem("userAgreed", "true");
-			const safetyResponse = await AsyncStorage.getItem("safetyResponse");
-
-			// Already finished safety before — go home after re-confirming disclaimer.
-			if (safetyResponse === "no") {
-				enterMainApp("/(tabs)");
-				return;
-			}
-
 			router.replace("/firstquestionnaire");
 		} catch (error) {
 			console.error("Error saving agreement status", error);
@@ -38,7 +32,7 @@ const FirstDisclaimer = () => {
 				<TouchableOpacity
 					style={styles.button}
 					onPress={() => {
-						Alert.alert(i18n.t("warning"), i18n.t("disagreeDisclaimer"));
+						showAlert(i18n.t("warning"), i18n.t("disagreeDisclaimer"));
 					}}
 				>
 					<Text style={styles.buttonText}>{i18n.t("disagree")}</Text>
@@ -73,7 +67,7 @@ const styles = StyleSheet.create({
 		fontSize: 24,
 		lineHeight: 32,
 		color: "#333",
-		textAlign: "center",
+		textAlign: "left",
 	},
 	buttonContainer: {
 		flexDirection: "column",

@@ -1,61 +1,47 @@
 import React, { useContext } from "react";
-import { StyleSheet, ScrollView, Text, SafeAreaView } from "react-native";
+import { Platform, StyleSheet, ScrollView, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LocaleContext } from "../../../contexts/LocaleContext";
+import { RFValue } from "react-native-responsive-fontsize";
+
+const TAB_BAR_HEIGHT = 100;
 
 const Disclaimer = () => {
 	const { i18n } = useContext(LocaleContext);
+	const insets = useSafeAreaInsets();
+	const bottomPad =
+		Platform.OS === "ios" ? TAB_BAR_HEIGHT + Math.max(insets.bottom, 8) : TAB_BAR_HEIGHT + Math.max(insets.bottom, 16);
 
 	return (
-		<SafeAreaView style={styles.container}>
-			<Text style={styles.title}>{i18n.t("settingDisclaimer")}</Text>
-			<ScrollView style={styles.scrollView}>
+		<View style={styles.container}>
+			<ScrollView
+				style={styles.scrollView}
+				contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomPad }]}
+				showsVerticalScrollIndicator
+			>
 				<Text style={styles.text}>{i18n.t("disclaimer")}</Text>
 			</ScrollView>
-		</SafeAreaView>
+		</View>
 	);
 };
 
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-	},
-	title: {
-		fontSize: 24,
-		fontWeight: "bold",
-		color: "#007BFF",
-		marginBottom: 16,
-		padding: 20,
-		textAlign: "center",
-		backgroundColor: "#f8f9fa",
+		backgroundColor: "#fff",
 	},
 	scrollView: {
 		flex: 1,
-		marginBottom: 16,
-		padding: 12,
+	},
+	scrollContent: {
+		padding: 16,
+		flexGrow: 1,
 	},
 	text: {
-		fontSize: 24,
-		lineHeight: 32,
+		fontSize: RFValue(16),
+		lineHeight: RFValue(26),
 		color: "#333",
-		textAlign: "center",
-	},
-	buttonContainer: {
-		flexDirection: "column",
-		justifyContent: "space-between",
-		padding: 16,
-	},
-	button: {
-		backgroundColor: "#007BFF",
-		paddingVertical: 22,
-		paddingHorizontal: 32,
-		borderRadius: 8,
-		marginVertical: 8,
-		alignItems: "center",
-	},
-	buttonText: {
-		color: "#fff",
-		fontSize: 22,
-		fontWeight: "bold",
+		textAlign: "left",
 	},
 });
 

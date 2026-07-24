@@ -1,32 +1,47 @@
 import React, { useContext } from "react";
-import { Stack } from "expo-router";
+import { Stack, router } from "expo-router";
+import { TouchableOpacity } from "react-native";
 import { LocaleContext } from "../../../contexts/LocaleContext";
-import HeaderBackButton from "../../../components/HeaderBackButton";
-
-const stackScreenOptions = {
-	headerShown: true,
-	gestureEnabled: true,
-	fullScreenGestureEnabled: true,
-	animation: "slide_from_right",
-	headerBackTitleVisible: false,
-};
+import { Ionicons } from "@expo/vector-icons";
+import { RFValue } from "react-native-responsive-fontsize";
 
 export default function RiskLayout() {
 	const { i18n } = useContext(LocaleContext);
 
+	const renderBackButton = () => (
+		<TouchableOpacity onPress={() => router.navigate("/(tabs)")}>
+			<Ionicons name="chevron-back" size={RFValue(18)} color={"#000"} />
+		</TouchableOpacity>
+	);
+
 	return (
-		<Stack screenOptions={stackScreenOptions}>
+		<Stack
+			screenOptions={{
+				headerShown: false,
+			}}
+		>
 			<Stack.Screen
 				name="index"
 				options={{
+					headerShown: true,
 					title: i18n.t("risk"),
-					headerLeft: () => <HeaderBackButton />,
-					gestureEnabled: false,
-					fullScreenGestureEnabled: false,
+					headerLeft: renderBackButton,
 				}}
 			/>
-			<Stack.Screen name="questionnaire" options={{ title: i18n.t("parq") }} />
-			<Stack.Screen name="safety" options={{ title: i18n.t("sprm") }} />
+			<Stack.Screen
+				name="questionnaire"
+				options={{
+					title: i18n.t("parq"),
+					headerShown: true,
+				}}
+			/>
+			<Stack.Screen
+				name="safety"
+				options={{
+					title: i18n.t("sprm"),
+					headerShown: true,
+				}}
+			/>
 		</Stack>
 	);
 }

@@ -1,25 +1,22 @@
 import React, { useContext, useState } from "react";
-import { Platform, View, Text, FlatList, Image, StyleSheet, TouchableOpacity } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { View, Text, FlatList, Image, StyleSheet, TouchableOpacity } from "react-native";
 import { useFocusEffect } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { LocaleContext } from "../../contexts/LocaleContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { router } from "expo-router";
+import { getLearningProgress } from "../../utils/learning";
+import { getBookmarks, saveBookmarks } from "../../utils/bookmarks";
 import { RFValue } from "react-native-responsive-fontsize";
-
-const TAB_BAR_HEIGHT = 100;
+import { heightPercentageToDP as hp } from "react-native-responsive-screen";
 
 const Favourite = () => {
-	const { i18n } = useContext(LocaleContext);
+	const { i18n, locale, changeLanguage } = useContext(LocaleContext);
 	const { isGuest } = useAuth();
-	const insets = useSafeAreaInsets();
-	const bottomInset =
-		Platform.OS === "ios" ? TAB_BAR_HEIGHT + Math.max(insets.bottom, 8) : Math.max(insets.bottom, 16);
 	const equipmentData = i18n.t("equipmentList", { returnObjects: true });
 	const [bookmarkedItems, setBookmarkedItems] = useState([]);
 	const [bookmarked, setBookmarked] = useState({});
+	const [learning, setLearning] = useState({});
 	const buttons = [
 		{ icon: require("@/assets/icons/outdoor/list.png"), text: i18n.t("all") },
 		{ icon: require("@/assets/icons/outdoor/muscle.png"), text: i18n.t("muscle") },
@@ -43,19 +40,22 @@ const Favourite = () => {
 
 	useFocusEffect(
 		React.useCallback(() => {
+			if (isGuest) return;
 			const fetchBookmarkedItems = async () => {
 				try {
-					const savedBookmarks = await AsyncStorage.getItem("bookmarkedItems");
-					const bookmarked = savedBookmarks ? JSON.parse(savedBookmarks) : {};
+					const bookmarked = await getBookmarks();
 					setBookmarked(bookmarked);
 					const items = equipmentData.filter((item) => bookmarked[item.id]);
 					setBookmarkedItems(items);
+					// App Upgrade #10: learning progress of "My favorite" items
+					const progress = await getLearningProgress();
+					setLearning(progress);
 				} catch (error) {
 					console.error("Error fetching bookmarked items", error);
 				}
 			};
 			fetchBookmarkedItems();
-		}, [])
+		}, [isGuest])
 	);
 
 	const toggleBookmark = async (itemId) => {
@@ -67,7 +67,7 @@ const Favourite = () => {
 				updatedBookmarks[itemId] = true;
 			}
 			setBookmarked(updatedBookmarks);
-			await AsyncStorage.setItem("bookmarkedItems", JSON.stringify(updatedBookmarks));
+			await saveBookmarks(updatedBookmarks);
 			const items = equipmentData.filter((item) => updatedBookmarks[item.id]);
 			setBookmarkedItems(items);
 		} catch (error) {
@@ -90,9 +90,9 @@ const Favourite = () => {
 					</TouchableOpacity>
 				</View>
 			) : (
-				<FlatList
+			<FlatList
 				data={bookmarkedItems}
-				contentContainerStyle={{ paddingTop: 16, paddingBottom: bottomInset }}
+				contentContainerStyle={{ paddingTop: 16, paddingBottom: hp("15%") }}
 				keyExtractor={(item) => item.id.toString()}
 				renderItem={({ item }) => (
 					<TouchableOpacity
@@ -102,6 +102,26 @@ const Favourite = () => {
 						<Image source={item.icon} style={styles.image} />
 						<View style={styles.info}>
 							<Text style={styles.name}>{item.name}</Text>
+							{/* App Upgrade #10: read / watched / listened badges */}
+							<View style={styles.progressRow}>
+								<Ionicons
+									name={learning[item.id]?.read ? "book" : "book-outline"}
+									size={20}
+									color={learning[item.id]?.read ? "#2E8B57" : "#bbb"}
+								/>
+								<Ionicons
+									name={learning[item.id]?.watched ? "videocam" : "videocam-outline"}
+									size={20}
+									color={learning[item.id]?.watched ? "#2E8B57" : "#bbb"}
+									style={{ marginLeft: 8 }}
+								/>
+								<Ionicons
+									name={learning[item.id]?.listened ? "volume-high" : "volume-mute-outline"}
+									size={20}
+									color={learning[item.id]?.listened ? "#2E8B57" : "#bbb"}
+									style={{ marginLeft: 8 }}
+								/>
+							</View>
 						</View>
 						{renderCategoryIcons(item.categories)}
 						<TouchableOpacity style={styles.bookmark} onPress={() => toggleBookmark(item.id)}>
@@ -182,6 +202,11 @@ const styles = StyleSheet.create({
 		fontWeight: "bold",
 		flexShrink: 1,
 	},
+	progressRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		marginTop: 8,
+	},
 	type: {
 		fontSize: 14,
 		color: "#666",
@@ -220,29 +245,29 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 32,
 	},
 	restrictedTitle: {
-		marginTop: 20,
-		fontSize: RFValue(20),
+		marginTop: 16,
+		fontSize: RFValue(18),
 		fontWeight: "bold",
-		color: "#333",
+		color: "#840B1C",
 		textAlign: "center",
 	},
 	restrictedText: {
-		marginTop: 12,
+		marginTop: 10,
 		fontSize: RFValue(14),
-		color: "#666",
+		color: "#555",
 		textAlign: "center",
-		lineHeight: RFValue(22),
+		lineHeight: RFValue(20),
 	},
 	loginButton: {
-		marginTop: 24,
+		marginTop: 20,
 		backgroundColor: "#840B1C",
 		borderRadius: 24,
-		paddingHorizontal: 28,
+		paddingHorizontal: 24,
 		paddingVertical: 12,
 	},
 	loginButtonText: {
 		color: "#fff",
-		fontSize: RFValue(16),
+		fontSize: RFValue(14),
 		fontWeight: "bold",
 	},
 });

@@ -1,7 +1,6 @@
 import React, { useContext, useState } from "react";
 import {
 	ActivityIndicator,
-	Alert,
 	ImageBackground,
 	KeyboardAvoidingView,
 	Platform,
@@ -17,6 +16,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { RFValue } from "react-native-responsive-fontsize";
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
 import { LocaleContext } from "../contexts/LocaleContext";
+import { showAlert } from "../utils/alert";
 import { useAuth } from "../contexts/AuthContext";
 import { USER_PROFILE_ROLES } from "../constants/auth";
 import { navigateAfterAuth } from "../utils/onboarding";
@@ -58,11 +58,11 @@ export default function RegisterScreen() {
 
 		if (!result.success) {
 			const messageKey = ERROR_MESSAGES[result.error] || "registerRequired";
-			Alert.alert(i18n.t("warning"), i18n.t(messageKey));
+			showAlert(i18n.t("warning"), i18n.t(messageKey));
 			return;
 		}
 
-		Alert.alert("", i18n.t("registerSuccess"), [
+		showAlert("", i18n.t("registerSuccess"), [
 			{
 				text: "OK",
 				onPress: () => navigateAfterAuth(from),

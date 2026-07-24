@@ -1,206 +1,228 @@
-import React, { useContext, useEffect, useState } from "react";
+// App Upgrade #6: SMART goal setting with written guidance + carry over to next week
+import React, { useCallback, useContext, useState } from "react";
 import {
-	Alert,
-	Platform,
-	ScrollView,
 	StyleSheet,
+	View,
 	Text,
 	TextInput,
 	TouchableOpacity,
-	View,
+	ScrollView,
+	Alert,
+	KeyboardAvoidingView,
+	Platform,
 } from "react-native";
-import { router, useNavigation } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { RFValue } from "react-native-responsive-fontsize";
-import { widthPercentageToDP as wp } from "react-native-responsive-screen";
+import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
+import { Collapsible } from "@/components/Collapsible";
 import { LocaleContext } from "../../../contexts/LocaleContext";
-import { useAuth } from "../../../contexts/AuthContext";
-import { createSmartGoalId, getGoalsForUser, setSmartGoals } from "../../../utils/goalStorage";
-import { getOwnerKey } from "../../../utils/sessionStorage";
+import { showAlert } from "../../../utils/alert";
+import {
+	getGoalState,
+	addSmartGoal,
+	toggleSmartGoal,
+	removeSmartGoal,
+	carryOverSmartGoals,
+	getCurrentWeekSmartGoals,
+	getPastWeekSmartGoals,
+} from "../../../utils/goals";
 
-const TAB_BAR_HEIGHT = 100;
-
-export default function SmartGoalScreen() {
+const SmartGoal = () => {
 	const { i18n } = useContext(LocaleContext);
-	const { user, isGuest } = useAuth();
-	const navigation = useNavigation();
-	const insets = useSafeAreaInsets();
-	const bottomInset =
-		Platform.OS === "ios" ? TAB_BAR_HEIGHT + Math.max(insets.bottom, 8) : Math.max(insets.bottom, 16);
+	const [text, setText] = useState("");
+	const [currentGoals, setCurrentGoals] = useState([]);
+	const [pastGoals, setPastGoals] = useState([]);
 
-	const [goals, setGoals] = useState([{ id: createSmartGoalId(), text: "" }]);
-	const [saving, setSaving] = useState(false);
+	const load = useCallback(async () => {
+		const state = await getGoalState();
+		setCurrentGoals(getCurrentWeekSmartGoals(state));
+		setPastGoals(getPastWeekSmartGoals(state));
+	}, []);
 
-	useEffect(() => {
-		navigation.setOptions({ headerTitle: i18n.t("goalSmartTitle") });
-	}, [navigation, i18n]);
+	useFocusEffect(
+		useCallback(() => {
+			load();
+		}, [load])
+	);
 
-	useEffect(() => {
-		if (isGuest) {
-			router.replace("/(tabs)");
-			return;
-		}
-		const load = async () => {
-			const data = await getGoalsForUser(getOwnerKey(user));
-			if (data?.smartGoals?.length) {
-				setGoals(data.smartGoals.map((item) => ({ id: item.id, text: item.text })));
-			}
-		};
+	const handleAdd = async () => {
+		if (!text.trim()) return;
+		await addSmartGoal(text.trim());
+		setText("");
 		load();
-	}, [isGuest, user]);
-
-	const updateText = (id, text) => {
-		setGoals((items) => items.map((item) => (item.id === id ? { ...item, text } : item)));
 	};
 
-	const addGoal = () => {
-		setGoals((items) => [...items, { id: createSmartGoalId(), text: "" }]);
+	const handleToggle = async (id) => {
+		await toggleSmartGoal(id);
+		load();
 	};
 
-	const removeGoal = (id) => {
-		setGoals((items) => (items.length <= 1 ? items : items.filter((item) => item.id !== id)));
+	const handleRemove = (id) => {
+		showAlert("", i18n.t("deleteSessionConfirm"), [
+			{ text: i18n.t("cancel"), style: "cancel" },
+			{
+				text: i18n.t("delete"),
+				style: "destructive",
+				onPress: async () => {
+					await removeSmartGoal(id);
+					load();
+				},
+			},
+		]);
 	};
 
-	const handleSave = async () => {
-		const ownerKey = getOwnerKey(user);
-		if (!ownerKey) {
-			return;
-		}
-		const cleaned = goals
-			.map((item) => ({ id: item.id, text: item.text.trim() }))
-			.filter((item) => item.text.length > 0);
-
-		setSaving(true);
-		try {
-			await setSmartGoals(ownerKey, cleaned);
-			Alert.alert("", i18n.t("goalSmartSaved"), [{ text: "OK", onPress: () => router.back() }]);
-		} catch (error) {
-			Alert.alert(i18n.t("warning"), String(error?.message || error));
-		} finally {
-			setSaving(false);
-		}
+	// After each week there is an option to keep the same goals for the following week
+	const handleCarryOver = async () => {
+		await carryOverSmartGoals();
+		showAlert("", i18n.t("goalsCarriedOver"));
+		load();
 	};
 
 	return (
-		<ScrollView
-			style={styles.scroll}
-			contentContainerStyle={[styles.container, { paddingBottom: bottomInset + 20 }]}
-			keyboardShouldPersistTaps="handled"
-		>
-			<View style={styles.card}>
-				<Text style={styles.sectionTitle}>{i18n.t("goalSmartGuidanceTitle")}</Text>
-				<Text style={styles.guidance}>{i18n.t("goalSmartGuidance")}</Text>
-			</View>
+		<KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+			<ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: hp("15%") }}>
+				{/* Written guidance on how to write a proper SMART goal */}
+				<View style={styles.guidanceBox}>
+					<Collapsible title={i18n.t("smartGuidanceTitle")}>
+						<Text style={styles.guidanceText}>{i18n.t("smartGuidance")}</Text>
+					</Collapsible>
+				</View>
 
-			{goals.map((item, index) => (
-				<View key={item.id} style={styles.card}>
-					<View style={styles.rowHeader}>
-						<Text style={styles.sectionTitle}>
-							{i18n.t("goalSmart")} {index + 1}
-						</Text>
-						{goals.length > 1 && (
-							<TouchableOpacity onPress={() => removeGoal(item.id)}>
-								<Text style={styles.removeText}>{i18n.t("goalSmartRemove")}</Text>
-							</TouchableOpacity>
-						)}
-					</View>
+				<View style={styles.inputRow}>
 					<TextInput
 						style={styles.input}
-						value={item.text}
-						onChangeText={(text) => updateText(item.id, text)}
+						placeholder={i18n.t("smartPlaceholder")}
+						value={text}
+						onChangeText={setText}
 						multiline
-						placeholder={i18n.t("goalSmartPlaceholder")}
-						placeholderTextColor="#999"
 					/>
+					<TouchableOpacity style={styles.addBtn} onPress={handleAdd}>
+						<Ionicons name="add" size={RFValue(24)} color="#fff" />
+					</TouchableOpacity>
 				</View>
-			))}
 
-			<TouchableOpacity style={styles.addButton} onPress={addGoal}>
-				<Ionicons name="add-circle-outline" size={22} color="#840B1C" />
-				<Text style={styles.addButtonText}>{i18n.t("goalSmartAdd")}</Text>
-			</TouchableOpacity>
+				<Text style={styles.sectionTitle}>{i18n.t("smartGoals")}</Text>
+				{currentGoals.length === 0 && <Text style={styles.empty}>{i18n.t("noSmartGoals")}</Text>}
+				{currentGoals.map((goal) => (
+					<View key={goal.id} style={styles.goalRow}>
+						<TouchableOpacity onPress={() => handleToggle(goal.id)} style={styles.checkArea}>
+							<Ionicons
+								name={goal.done ? "checkbox" : "square-outline"}
+								size={RFValue(24)}
+								color={goal.done ? "#2E8B57" : "#888"}
+							/>
+						</TouchableOpacity>
+						<Text style={[styles.goalText, goal.done && styles.goalDone]}>{goal.text}</Text>
+						<TouchableOpacity onPress={() => handleRemove(goal.id)}>
+							<Ionicons name="trash-outline" size={RFValue(20)} color="#B00020" />
+						</TouchableOpacity>
+					</View>
+				))}
 
-			<TouchableOpacity
-				style={[styles.saveButton, saving && styles.disabled]}
-				onPress={handleSave}
-				disabled={saving}
-			>
-				<Text style={styles.saveButtonText}>{i18n.t("goalSmartSave")}</Text>
-			</TouchableOpacity>
-		</ScrollView>
+				{pastGoals.length > 0 && (
+					<TouchableOpacity style={styles.carryBtn} onPress={handleCarryOver}>
+						<Ionicons name="repeat" size={RFValue(18)} color="#fff" />
+						<Text style={styles.carryBtnText}>{i18n.t("keepSameGoals")}</Text>
+					</TouchableOpacity>
+				)}
+			</ScrollView>
+		</KeyboardAvoidingView>
 	);
-}
+};
 
 const styles = StyleSheet.create({
-	scroll: {
-		flex: 1,
-		backgroundColor: "#f7f7f7",
-	},
 	container: {
-		padding: wp("5%"),
-	},
-	card: {
+		flex: 1,
 		backgroundColor: "#fff",
+		paddingHorizontal: wp("5%"),
+	},
+	guidanceBox: {
+		backgroundColor: "#FFF7E6",
 		borderRadius: 12,
-		padding: 16,
-		marginBottom: 12,
+		padding: 14,
+		marginTop: hp("2%"),
+		borderWidth: 1,
+		borderColor: "#F0E4C2",
 	},
-	sectionTitle: {
-		fontSize: RFValue(15),
-		fontWeight: "bold",
-		color: "#333",
-		marginBottom: 8,
-	},
-	guidance: {
-		fontSize: RFValue(13),
-		color: "#555",
+	guidanceText: {
+		fontSize: RFValue(14),
 		lineHeight: RFValue(22),
+		color: "#444",
 	},
-	rowHeader: {
+	inputRow: {
 		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-	},
-	removeText: {
-		color: "#840B1C",
-		fontSize: RFValue(12),
-		fontWeight: "600",
+		alignItems: "flex-end",
+		marginTop: hp("2%"),
 	},
 	input: {
-		minHeight: 90,
+		flex: 1,
 		borderWidth: 1,
-		borderColor: "#ddd",
-		borderRadius: 10,
+		borderColor: "#ccc",
+		borderRadius: 12,
 		padding: 12,
-		textAlignVertical: "top",
-		fontSize: RFValue(14),
+		fontSize: RFValue(15),
+		minHeight: RFValue(48),
+		backgroundColor: "#f8f9fa",
+	},
+	addBtn: {
+		backgroundColor: "#840B1C",
+		borderRadius: 12,
+		width: RFValue(48),
+		height: RFValue(48),
+		justifyContent: "center",
+		alignItems: "center",
+		marginLeft: 10,
+	},
+	sectionTitle: {
+		fontSize: RFValue(18),
+		fontWeight: "bold",
+		marginTop: hp("3%"),
+		marginBottom: hp("1%"),
 		color: "#333",
 	},
-	addButton: {
+	empty: {
+		fontSize: RFValue(14),
+		color: "#999",
+		marginVertical: hp("1%"),
+	},
+	goalRow: {
 		flexDirection: "row",
 		alignItems: "center",
-		gap: 6,
-		marginBottom: 16,
-		paddingVertical: 8,
+		backgroundColor: "#f8f9fa",
+		borderRadius: 12,
+		padding: 14,
+		marginBottom: 10,
 	},
-	addButtonText: {
-		color: "#840B1C",
-		fontSize: RFValue(14),
-		fontWeight: "600",
+	checkArea: {
+		marginRight: 10,
 	},
-	saveButton: {
-		backgroundColor: "#840B1C",
-		borderRadius: 50,
-		paddingVertical: 16,
+	goalText: {
+		flex: 1,
+		fontSize: RFValue(15),
+		color: "#333",
+		marginRight: 10,
+	},
+	goalDone: {
+		textDecorationLine: "line-through",
+		color: "#999",
+	},
+	carryBtn: {
+		flexDirection: "row",
+		justifyContent: "center",
 		alignItems: "center",
+		backgroundColor: "#2E8B57",
+		borderRadius: 12,
+		paddingVertical: 14,
+		marginTop: hp("2%"),
+		gap: 8,
 	},
-	saveButtonText: {
+	carryBtnText: {
 		color: "#fff",
-		fontSize: RFValue(16),
+		fontSize: RFValue(15),
 		fontWeight: "bold",
-	},
-	disabled: {
-		opacity: 0.7,
+		marginLeft: 6,
 	},
 });
+
+export default SmartGoal;

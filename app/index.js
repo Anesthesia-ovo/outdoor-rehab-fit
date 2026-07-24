@@ -1,23 +1,60 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { router } from "expo-router";
-import { StyleSheet, View, Animated, TouchableOpacity, Text, ImageBackground, Button } from "react-native";
+import { StyleSheet, View, Animated, TouchableOpacity, Text, ImageBackground } from "react-native";
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
 import * as Updates from "expo-updates";
 import { RFValue } from "react-native-responsive-fontsize";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function HomeScreen() {
 	const { currentlyRunning, isUpdateAvailable, isUpdatePending } = Updates.useUpdates();
+	const { ready, isAuthenticated } = useAuth();
+	// null = still deciding, true = show Start cover
+	const [displayStart, setDisplayStart] = useState(null);
 
 	useEffect(() => {
 		if (isUpdatePending) {
-			// Update has successfully downloaded; apply it now
 			Updates.reloadAsync();
 		}
 	}, [isUpdatePending]);
 
-	const fadeAnim = useRef(new Animated.Value(0)).current; // Initial opacity value: 0
-	const scaleAnim = useRef(new Animated.Value(0.5)).current; // Initial scale value: 0.5
+	// Keep the Start screen, but skip it when the user already has a valid session
+	// (logged-in or guest). If onboarding is done but not logged in, go to login.
 	useEffect(() => {
+		if (!ready) return;
+
+		const decide = async () => {
+			try {
+				const agreed = await AsyncStorage.getItem("userAgreed");
+
+				if (isAuthenticated) {
+					// Already signed in (user or guest) → enter the app directly
+					router.replace("/(tabs)");
+					return;
+				}
+
+				if (agreed) {
+					// Onboarding finished, but no session → login
+					router.replace("/login");
+					return;
+				}
+
+				// First launch: show Start cover
+				setDisplayStart(true);
+			} catch (error) {
+				console.error("Error checking start-screen routing", error);
+				setDisplayStart(true);
+			}
+		};
+
+		decide();
+	}, [ready, isAuthenticated]);
+
+	const fadeAnim = useRef(new Animated.Value(0)).current;
+	const scaleAnim = useRef(new Animated.Value(0.5)).current;
+	useEffect(() => {
+		if (!displayStart) return;
 		Animated.parallel([
 			Animated.timing(fadeAnim, {
 				toValue: 1,
@@ -30,7 +67,12 @@ export default function HomeScreen() {
 				useNativeDriver: true,
 			}),
 		]).start();
-	}, [fadeAnim, scaleAnim]);
+	}, [fadeAnim, scaleAnim, displayStart]);
+
+	// While auth/onboarding is being checked, only show the background (avoid flash)
+	if (!displayStart) {
+		return <ImageBackground source={require("@/assets/images/background.png")} resizeMethod="cover" style={styles.background} />;
+	}
 
 	return (
 		<ImageBackground source={require("@/assets/images/background.png")} resizeMethod="cover" style={styles.background}>
@@ -45,7 +87,8 @@ export default function HomeScreen() {
 						},
 					]}
 				/>
-				<TouchableOpacity style={styles.button} onPress={() => router.replace("/login")}>
+				{/* replace so Start is not left under the navigation stack */}
+				<TouchableOpacity style={styles.button} onPress={() => router.replace("/firstdisclaimer")}>
 					<Text style={styles.buttonText}>Start 開始</Text>
 				</TouchableOpacity>
 				<Text style={styles.appVersionText}>App version 1.0.0</Text>

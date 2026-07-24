@@ -3,39 +3,31 @@ import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { RFValue } from "react-native-responsive-fontsize";
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
-import { fetchWeatherData, unavailableWeather } from "../utils/weather";
 
 const WeatherComponent = ({ i18n }) => {
 	const [weather, setWeather] = useState(null);
 	const [loading, setLoading] = useState(true);
 
 	useEffect(() => {
-		fetchWeatherData()
-			.then(setWeather)
-			.catch((error) => {
-				console.error("Error fetching weather data:", error);
-				setWeather(unavailableWeather);
+		fetch("https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=tc")
+			.then((response) => response.json())
+			.then((data) => {
+				const temperatureData = data.temperature?.data?.find((entry) => entry.place === "京士柏");
+				const uvData = Array.isArray(data.uvindex?.data) ? data.uvindex.data.find((entry) => entry.place === "京士柏") : null;
+				const humidityData = data.humidity?.data?.find((entry) => entry.place === "香港天文台");
+
+				setWeather({
+					temperature: temperatureData ? `${temperatureData.value}°${temperatureData.unit}` : "N/A",
+					uvIndex: uvData ? `${uvData.value} (${uvData.desc})` : "N/A",
+					humidity: humidityData ? `${humidityData.value}%` : "N/A",
+				});
 			})
+			.catch((error) => console.error("Error fetching weather data:", error))
 			.finally(() => setLoading(false));
 	}, []);
 
 	if (loading) {
-		return (
-			<View style={styles.loadingContainer}>
-				<ActivityIndicator size="large" color="#0000ff" />
-			</View>
-		);
-	}
-
-	if (!weather) {
-		return (
-			<View style={styles.outerContainer}>
-				<View style={styles.container}>
-					<Text style={styles.title}>{i18n.t("weatherInfo")}</Text>
-					<Text style={styles.text}>N/A</Text>
-				</View>
-			</View>
-		);
+		return <ActivityIndicator size="large" color="#0000ff" />;
 	}
 
 	return (
@@ -69,17 +61,9 @@ const WeatherComponent = ({ i18n }) => {
 };
 
 const styles = StyleSheet.create({
-	loadingContainer: {
-		minHeight: hp("8%"),
-		justifyContent: "center",
-		alignItems: "center",
-		width: "100%",
-	},
 	outerContainer: {
-		width: "100%",
+		flex: 1,
 		flexDirection: "row",
-		alignItems: "stretch",
-		gap: wp("2%"),
 		shadowColor: "#000",
 		shadowOffset: { width: 0, height: 4 },
 		shadowOpacity: 0.3,
@@ -87,10 +71,9 @@ const styles = StyleSheet.create({
 		elevation: 5,
 	},
 	container: {
-		flex: 1,
-		minWidth: 0,
-		padding: RFValue(10),
+		padding: RFValue(12),
 		borderRadius: 10,
+		marginHorizontal: wp("1%"),
 		backgroundColor: "rgba(255, 255, 255, 0.8)",
 		justifyContent: "center",
 	},
@@ -102,19 +85,17 @@ const styles = StyleSheet.create({
 	infoContainer: {
 		flexDirection: "row",
 		alignItems: "center",
-		flexShrink: 1,
 	},
 	text: {
 		fontSize: RFValue(12),
 		marginLeft: wp("1%"),
-		flexShrink: 1,
 	},
 	suggestion: {
 		fontSize: RFValue(10),
 		color: "#ff6600",
 		fontWeight: "bold",
 		textAlign: "center",
-		flexShrink: 1,
+		width: wp("40%"),
 	},
 });
 

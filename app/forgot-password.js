@@ -1,7 +1,6 @@
 import React, { useContext, useState } from "react";
 import {
 	ActivityIndicator,
-	Alert,
 	ImageBackground,
 	KeyboardAvoidingView,
 	Platform,
@@ -18,6 +17,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { RFValue } from "react-native-responsive-fontsize";
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
 import { LocaleContext } from "../contexts/LocaleContext";
+import { showAlert } from "../utils/alert";
 import { resetPasswordWithCode, sendDemoVerificationCode } from "../constants/auth";
 
 const ERROR_MESSAGES = {
@@ -45,7 +45,7 @@ export default function ForgotPasswordScreen() {
 
 	const handleSendCode = async () => {
 		if (!identifier.trim()) {
-			Alert.alert(i18n.t("warning"), i18n.t("resetIdentifierRequired"));
+			showAlert(i18n.t("warning"), i18n.t("resetIdentifierRequired"));
 			return;
 		}
 
@@ -55,14 +55,14 @@ export default function ForgotPasswordScreen() {
 
 		if (!result.success) {
 			const messageKey = ERROR_MESSAGES[result.error] || "accountNotFound";
-			Alert.alert(i18n.t("warning"), i18n.t(messageKey));
+			showAlert(i18n.t("warning"), i18n.t(messageKey));
 			return;
 		}
 
 		setDemoCode(result.demoCode);
 		setChannel(result.channel);
 		setStep(2);
-		Alert.alert(
+		showAlert(
 			i18n.t("codeSentTitle"),
 			i18n.t("codeSentDemoMessage", {
 				channel: result.channel === "email" ? i18n.t("emailChannel") : i18n.t("phoneChannel"),
@@ -78,11 +78,11 @@ export default function ForgotPasswordScreen() {
 
 		if (!result.success) {
 			const messageKey = ERROR_MESSAGES[result.error] || "resetRequired";
-			Alert.alert(i18n.t("warning"), i18n.t(messageKey));
+			showAlert(i18n.t("warning"), i18n.t(messageKey));
 			return;
 		}
 
-		Alert.alert("", i18n.t("resetSuccess"), [
+		showAlert("", i18n.t("resetSuccess"), [
 			{
 				text: "OK",
 				onPress: () => router.replace({ pathname: "/login", params: { from } }),

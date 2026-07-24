@@ -1,38 +1,28 @@
 import React, { useContext } from "react";
 import { Platform, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+
 import { HapticTab } from "@/components/HapticTab";
 import { IconSymbol } from "@/components/ui/IconSymbol";
 import TabBarBackground from "@/components/ui/TabBarBackground";
 import { Colors } from "@/constants/Colors";
+
 import { RFValue } from "react-native-responsive-fontsize";
+
 import { LocaleContext } from "../../contexts/LocaleContext";
-import { useAuth } from "../../contexts/AuthContext";
-import { FEATURES } from "../../constants/permissions";
-import { guardGuestAccess } from "../../utils/accessControl";
-import { Tabs } from "expo-router";
-import { goBackOrHome } from "../../utils/navigation";
+
+import { Tabs, router } from "expo-router";
 
 const renderBackButton = () => (
-	<TouchableOpacity onPress={goBackOrHome}>
+	<TouchableOpacity onPress={() => router.back()}>
 		<Ionicons name="chevron-back" size={RFValue(18)} color={"#000"} />
 	</TouchableOpacity>
 );
 
 export default function TabLayout() {
 	const { i18n } = useContext(LocaleContext);
-	const { isGuest } = useAuth();
-
-	const handleGuestTabPress = (feature, e) => {
-		if (!isGuest) {
-			return;
-		}
-
-		e.preventDefault();
-		guardGuestAccess(feature, isGuest, i18n, () => {});
-	};
-
 	return (
 		<Tabs
 			screenOptions={{
@@ -42,6 +32,7 @@ export default function TabLayout() {
 				tabBarBackground: TabBarBackground,
 				tabBarStyle: Platform.select({
 					ios: {
+						// Use a transparent background on iOS to show the blur effect
 						position: "absolute",
 						height: 100,
 					},
@@ -50,11 +41,11 @@ export default function TabLayout() {
 					},
 				}),
 				tabBarLabelStyle: {
-					fontSize: 18,
-					marginTop: 3,
+					fontSize: 18, // Increase font size for better readability
+					marginTop: 3, // Adjust margin to position the label
 				},
 				tabBarIconStyle: {
-					marginTop: 12,
+					marginTop: 12, // Adjust margin to position the icon
 				},
 			}}
 		>
@@ -67,9 +58,6 @@ export default function TabLayout() {
 			/>
 			<Tabs.Screen
 				name="favorite"
-				listeners={{
-					tabPress: (e) => handleGuestTabPress(FEATURES.FAVORITE, e),
-				}}
 				options={{
 					title: i18n.t("favorite"),
 					headerShown: true,
@@ -90,8 +78,12 @@ export default function TabLayout() {
 			<Tabs.Screen name="outdoor" options={{ href: null }} />
 			<Tabs.Screen name="location" options={{ href: null }} />
 			<Tabs.Screen name="research" options={{ href: null }} />
-			<Tabs.Screen name="session" options={{ href: null }} />
+			<Tabs.Screen name="session" options={{ href: null, tabBarStyle: { display: "none" } }} />
+			<Tabs.Screen name="sessionlog" options={{ href: null }} />
 			<Tabs.Screen name="goals" options={{ href: null }} />
+			<Tabs.Screen name="chat" options={{ href: null, tabBarStyle: { display: "none" } }} />
+			<Tabs.Screen name="stats" options={{ href: null }} />
+			<Tabs.Screen name="equipmentmap" options={{ href: null }} />
 		</Tabs>
 	);
 }

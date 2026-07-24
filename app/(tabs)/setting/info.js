@@ -1,11 +1,23 @@
 import React, { useContext } from "react";
-import { StyleSheet, ScrollView, Text, View } from "react-native";
+import { Platform, StyleSheet, ScrollView, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LocaleContext } from "../../../contexts/LocaleContext";
+import { RFValue } from "react-native-responsive-fontsize";
+
+const TAB_BAR_HEIGHT = 100;
 
 export default function Info() {
 	const { i18n } = useContext(LocaleContext);
+	const insets = useSafeAreaInsets();
+	const bottomPad =
+		Platform.OS === "ios" ? TAB_BAR_HEIGHT + Math.max(insets.bottom, 8) : TAB_BAR_HEIGHT + Math.max(insets.bottom, 16);
+
 	return (
-		<ScrollView contentContainerStyle={styles.container}>
+		<ScrollView
+			style={styles.scroll}
+			contentContainerStyle={[styles.container, { paddingBottom: bottomPad }]}
+			showsVerticalScrollIndicator
+		>
 			<View style={styles.articleContainer}>
 				<Text style={styles.articleText}>{i18n.t("intro")}</Text>
 			</View>
@@ -14,17 +26,22 @@ export default function Info() {
 }
 
 const styles = StyleSheet.create({
-	container: {
-		flexGrow: 1,
-		justifyContent: "center",
-		padding: 20,
+	scroll: {
+		flex: 1,
 		backgroundColor: "#ffffff",
 	},
+	container: {
+		flexGrow: 1,
+		padding: 20,
+	},
+	articleContainer: {
+		width: "100%",
+	},
 	articleText: {
-		fontSize: 22,
-		lineHeight: 28,
-		fontWeight: "bold",
+		fontSize: RFValue(16),
+		lineHeight: RFValue(26),
+		fontWeight: "600",
 		color: "#333333",
-		textAlign: "center",
+		textAlign: "left",
 	},
 });

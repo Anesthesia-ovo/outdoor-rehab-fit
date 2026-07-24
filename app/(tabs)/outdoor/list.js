@@ -1,26 +1,16 @@
 import React, { useState, useEffect, useContext } from "react";
-import { Platform, View, Text, Image, StyleSheet, FlatList, TouchableOpacity } from "react-native";
+import { View, Text, Image, StyleSheet, FlatList, TouchableOpacity } from "react-native";
 import SearchBar from "../../../components/SearchBar";
 import { useLocalSearchParams } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useNavigation } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LocaleContext } from "../../../contexts/LocaleContext";
-import { useAuth } from "../../../contexts/AuthContext";
-import { showGuestRestrictionAlert } from "../../../utils/accessControl";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getBookmarks, saveBookmarks } from "../../../utils/bookmarks";
 import { RFValue } from "react-native-responsive-fontsize";
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
-
-const TAB_BAR_HEIGHT = 100;
-
 const EquipmentList = () => {
 	const { i18n } = useContext(LocaleContext);
-	const { isGuest } = useAuth();
-	const insets = useSafeAreaInsets();
-	const bottomInset =
-		Platform.OS === "ios" ? TAB_BAR_HEIGHT + Math.max(insets.bottom, 8) : Math.max(insets.bottom, 16);
 	const equipmentData = i18n.t("equipmentList", { returnObjects: true });
 	const buttons = [
 		{ icon: require("@/assets/icons/outdoor/list.png"), text: i18n.t("all") },
@@ -57,10 +47,7 @@ const EquipmentList = () => {
 	useEffect(() => {
 		const loadBookmarks = async () => {
 			try {
-				const storedBookmarks = await AsyncStorage.getItem("bookmarkedItems");
-				if (storedBookmarks) {
-					setBookmarked(JSON.parse(storedBookmarks));
-				}
+				setBookmarked(await getBookmarks());
 			} catch (error) {
 				console.error("Error loading bookmarks", error);
 			}
@@ -70,11 +57,6 @@ const EquipmentList = () => {
 	}, []);
 
 	const toggleBookmark = async (itemId) => {
-		if (isGuest) {
-			showGuestRestrictionAlert(i18n);
-			return;
-		}
-
 		try {
 			let updatedBookmarks = { ...bookmarked };
 			if (updatedBookmarks[itemId]) {
@@ -83,7 +65,7 @@ const EquipmentList = () => {
 				updatedBookmarks[itemId] = true;
 			}
 			setBookmarked(updatedBookmarks);
-			await AsyncStorage.setItem("bookmarkedItems", JSON.stringify(updatedBookmarks));
+			await saveBookmarks(updatedBookmarks);
 		} catch (error) {
 			console.error("Error updating bookmarks", error);
 		}
@@ -101,8 +83,9 @@ const EquipmentList = () => {
 			<SearchBar value={searchQuery} onChangeText={setSearchQuery} placeholder={i18n.t("searching")} />
 			<FlatList
 				data={filteredEquipmentList}
-				contentContainerStyle={{ alignItems: "center", paddingBottom: bottomInset }}
+				contentContainerStyle={{ alignItems: "center", paddingBottom: hp("15%") }}
 				keyExtractor={(item) => item.id.toString()}
+				showsVerticalScrollIndicator={false}
 				renderItem={({ item }) => (
 					<TouchableOpacity
 						onPress={() => router.push({ pathname: "/outdoor/detail", params: item })}

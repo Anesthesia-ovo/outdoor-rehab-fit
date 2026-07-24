@@ -1,30 +1,56 @@
 import React, { useContext } from "react";
-import { Stack } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { Stack, router } from "expo-router";
 import { LocaleContext } from "../../../contexts/LocaleContext";
+import { TouchableOpacity } from "react-native";
+import { RFValue } from "react-native-responsive-fontsize";
 
-const stackScreenOptions = {
-	headerShown: true,
-	gestureEnabled: true,
-	fullScreenGestureEnabled: true,
-	animation: "slide_from_right",
-	headerBackTitleVisible: false,
-};
+const renderBackButton = () => (
+	<TouchableOpacity onPress={() => router.back()} style={{ paddingHorizontal: 8 }}>
+		<Ionicons name="chevron-back" size={RFValue(18)} color={"#000"} />
+	</TouchableOpacity>
+);
 
 export default function SettingLayout() {
 	const { i18n } = useContext(LocaleContext);
 
 	return (
-		<Stack screenOptions={stackScreenOptions}>
+		<Stack
+			screenOptions={{
+				headerShown: false,
+			}}
+		>
 			<Stack.Screen
 				name="index"
 				options={{
-					headerShown: false,
 					title: i18n.t("setting"),
+					headerShown: false,
 				}}
 			/>
-			<Stack.Screen name="about" options={{ title: i18n.t("aboutApp") }} />
-			<Stack.Screen name="disclaimer" options={{ title: i18n.t("settingDisclaimer") }} />
-			<Stack.Screen name="info" options={{ title: i18n.t("aboutTeam") }} />
+			<Stack.Screen
+				name="about"
+				options={{
+					title: i18n.t("aboutApp"),
+					headerShown: true,
+					headerLeft: renderBackButton,
+				}}
+			/>
+			<Stack.Screen
+				name="disclaimer"
+				options={{
+					title: i18n.t("settingDisclaimer"),
+					headerShown: true,
+					headerLeft: renderBackButton,
+				}}
+			/>
+			<Stack.Screen
+				name="info"
+				options={{
+					title: i18n.t("aboutTeam"),
+					headerShown: true,
+					headerLeft: renderBackButton,
+				}}
+			/>
 		</Stack>
 	);
 }

@@ -3,6 +3,7 @@ import { StyleSheet, View, ScrollView, Text, TouchableOpacity, SafeAreaView, Ale
 import { LocaleContext } from "../../../contexts/LocaleContext";
 import { RFValue } from "react-native-responsive-fontsize";
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
+import { showAlert } from "../../../utils/alert";
 
 const Questionnaire = () => {
 	const { i18n } = useContext(LocaleContext);
@@ -16,7 +17,7 @@ const Questionnaire = () => {
 				<TouchableOpacity
 					style={styles.button}
 					onPress={() => {
-						Alert.alert("", i18n.t("questionnaireNo"));
+						showAlert("", i18n.t("questionnaireNo"));
 					}}
 				>
 					<Text style={styles.buttonText}>{i18n.t("yes")}</Text>
@@ -24,7 +25,7 @@ const Questionnaire = () => {
 				<TouchableOpacity
 					style={[styles.button, { backgroundColor: "#AAA" }]} //gray button
 					onPress={() => {
-						Alert.alert(i18n.t("warning"), i18n.t("questionnaireYes"));
+						showAlert(i18n.t("warning"), i18n.t("questionnaireYes"));
 					}}
 				>
 					<Text style={styles.buttonText}>{i18n.t("no")}</Text>
@@ -57,7 +58,7 @@ const styles = StyleSheet.create({
 		fontSize: RFValue(18),
 		lineHeight: 32,
 		color: "#333",
-		textAlign: "center",
+		textAlign: "left",
 	},
 	buttonContainer: {
 		flexDirection: "column",

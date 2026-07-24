@@ -1,535 +1,545 @@
-import React, { useContext, useEffect, useMemo, useState } from "react";
+// App Upgrade #5: Session summary - emotion scale, RPE, show more (journal +
+// exercise type record via photo + checkboxes), preset goal progress bars, save & continue
+import React, { useContext, useEffect, useState } from "react";
 import {
-	Alert,
-	Image,
-	Modal,
-	Platform,
-	ScrollView,
 	StyleSheet,
+	View,
 	Text,
 	TextInput,
 	TouchableOpacity,
-	View,
+	ScrollView,
+	Alert,
+	Modal,
+	Image,
+	FlatList,
+	KeyboardAvoidingView,
+	Platform,
 } from "react-native";
-import Slider from "@react-native-community/slider";
-import { router, useLocalSearchParams, useNavigation } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { router, useLocalSearchParams } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { RFValue } from "react-native-responsive-fontsize";
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
 import { LocaleContext } from "../../../contexts/LocaleContext";
-import { useAuth } from "../../../contexts/AuthContext";
-import WeeklyGoalProgress from "../../../components/WeeklyGoalProgress";
-import { getWeeklyProgress } from "../../../utils/goalStorage";
-import { ACTIVITY_TYPE_ICONS, getEquipmentIcon } from "../../../utils/equipmentImages";
-import {
-	createSessionId,
-	formatDateTime,
-	formatDuration,
-	getOwnerKey,
-	saveSession,
-} from "../../../utils/sessionStorage";
+import GoalProgressBars from "../../../components/GoalProgressBars";
+import { saveSession } from "../../../utils/sessions";
+import { getWeeklyProgress } from "../../../utils/goals";
+import { trackSessionCompleted, trackGoalAchieved } from "../../../utils/usage";
+import { formatDuration, formatDateTime } from "../../../utils/dates";
+import { showAlert } from "../../../utils/alert";
 
-const TAB_BAR_HEIGHT = 100;
+const EMOTIONS = [
+	{ value: 1, emoji: "😞" },
+	{ value: 2, emoji: "🙁" },
+	{ value: 3, emoji: "😐" },
+	{ value: 4, emoji: "🙂" },
+	{ value: 5, emoji: "😄" },
+];
 
-export default function SessionSummaryScreen() {
+const RPE_VALUES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+const SessionSummary = () => {
 	const { i18n, locale } = useContext(LocaleContext);
-	const { user, isGuest } = useAuth();
-	const navigation = useNavigation();
-	const insets = useSafeAreaInsets();
-	const params = useLocalSearchParams();
-	const bottomInset =
-		Platform.OS === "ios" ? TAB_BAR_HEIGHT + Math.max(insets.bottom, 8) : Math.max(insets.bottom, 16);
+	const { durationSec, mode } = useLocalSearchParams();
+	const equipmentData = i18n.t("equipmentList", { returnObjects: true });
 
-	const startedAt = params.startedAt;
-	const endedAt = params.endedAt || new Date().toISOString();
-	const durationSec = Number(params.durationSec || 0);
-	const sessionType = params.sessionType || "outdoor";
-
-	const equipmentList = i18n.t("equipmentList", { returnObjects: true }) || [];
-	const [emotion, setEmotion] = useState(3);
-	const [rpe, setRpe] = useState(5);
+	const [completedAt] = useState(new Date().toISOString());
+	const [emotion, setEmotion] = useState(null);
+	const [rpe, setRpe] = useState(null);
 	const [showMore, setShowMore] = useState(false);
 	const [journal, setJournal] = useState("");
-	const [exercises, setExercises] = useState([]);
-	const [doneAerobic, setDoneAerobic] = useState(false);
-	const [doneBalance, setDoneBalance] = useState(false);
-	const [doneStrength, setDoneStrength] = useState(false);
+	const [exercises, setExercises] = useState([]); // [{ name, reps, equipmentId }]
+	const [types, setTypes] = useState({ aerobic: false, balance: false, muscle: false });
+	const [typesTouched, setTypesTouched] = useState(false);
 	const [pickerVisible, setPickerVisible] = useState(false);
-	const [saving, setSaving] = useState(false);
-	const [weeklyProgress, setWeeklyProgress] = useState(null);
+	const [photoUri, setPhotoUri] = useState(null);
+	const [weekly, setWeekly] = useState(null);
 
 	useEffect(() => {
-		navigation.setOptions({ headerTitle: i18n.t("sessionSummaryTitle") });
-	}, [navigation, i18n]);
+		getWeeklyProgress().then(setWeekly);
+	}, []);
 
+	// Auto-fill the three type checkboxes from the exercise table (outdoor users);
+	// home users can still toggle them manually.
 	useEffect(() => {
-		if (isGuest) {
-			router.replace("/(tabs)");
-			return;
+		if (typesTouched || exercises.length === 0) return;
+		const next = { aerobic: false, balance: false, muscle: false };
+		exercises.forEach((ex) => {
+			const item = equipmentData.find((e) => e.id === ex.equipmentId);
+			if (!item) return;
+			["aerobic", "balance", "muscle"].forEach((t) => {
+				if (item.categories.includes(t)) next[t] = true;
+			});
+		});
+		setTypes(next);
+	}, [exercises]);
+
+	// Exercise type record: take a photo of the equipment / instruction board,
+	// then confirm the recognized equipment (image recognition service arrives at a later stage)
+	const handleTakePhoto = async () => {
+		const permission = await ImagePicker.requestCameraPermissionsAsync();
+		let result;
+		if (permission.granted) {
+			result = await ImagePicker.launchCameraAsync({ quality: 0.5 });
+		} else {
+			result = await ImagePicker.launchImageLibraryAsync({ quality: 0.5 });
 		}
-		const load = async () => {
-			const progress = await getWeeklyProgress(getOwnerKey(user));
-			setWeeklyProgress(progress);
-		};
-		load();
-	}, [isGuest, user]);
-
-	const syncCheckboxesFromExercises = (nextExercises) => {
-		const categories = nextExercises.flatMap((item) => item.categories || []);
-		if (categories.includes("aerobic")) setDoneAerobic(true);
-		if (categories.includes("balance")) setDoneBalance(true);
-		if (categories.includes("muscle")) setDoneStrength(true);
+		if (!result.canceled && result.assets?.length) {
+			setPhotoUri(result.assets[0].uri);
+			setPickerVisible(true);
+		}
 	};
 
-	const handleAddEquipment = (equipment) => {
-		const next = [
-			...exercises,
-			{
-				id: `${equipment.id}_${Date.now()}`,
-				equipmentId: equipment.id,
-				name: equipment.name,
-				categories: equipment.categories || [],
-				reps: "",
-			},
-		];
-		setExercises(next);
-		syncCheckboxesFromExercises(next);
+	const handleSelectEquipment = (item) => {
 		setPickerVisible(false);
+		setExercises((prev) => [...prev, { name: item.name, reps: "", equipmentId: item.id }]);
 	};
 
-	const updateReps = (id, reps) => {
-		setExercises((items) => items.map((item) => (item.id === id ? { ...item, reps } : item)));
+	const updateReps = (index, reps) => {
+		setExercises((prev) => prev.map((ex, i) => (i === index ? { ...ex, reps } : ex)));
 	};
 
-	const removeExercise = (id) => {
-		setExercises((items) => items.filter((item) => item.id !== id));
+	const removeExercise = (index) => {
+		setExercises((prev) => prev.filter((_, i) => i !== index));
+	};
+
+	const toggleType = (key) => {
+		setTypesTouched(true);
+		setTypes((prev) => ({ ...prev, [key]: !prev[key] }));
 	};
 
 	const handleSave = async () => {
-		const ownerKey = getOwnerKey(user);
-		if (!ownerKey) {
-			Alert.alert(i18n.t("warning"), i18n.t("guestRestrictedMessage"));
-			return;
-		}
+		const session = {
+			id: Date.now().toString(),
+			date: completedAt,
+			durationSec: Number(durationSec) || 0,
+			mode: mode === "home" ? "home" : "outdoor",
+			emotion,
+			rpe,
+			journal,
+			exercises: exercises.map((ex) => ({ name: ex.name, reps: ex.reps })),
+			types,
+		};
 
-		setSaving(true);
-		try {
-			await saveSession({
-				id: createSessionId(),
-				ownerKey,
-				sessionType,
-				startedAt,
-				endedAt,
-				durationSec,
-				emotionScale: Math.round(emotion),
-				rpeScale: Math.round(rpe),
-				journal: journal.trim(),
-				exercises: exercises.map((item) => ({
-					equipmentId: item.equipmentId,
-					name: item.name,
-					categories: item.categories,
-					reps: item.reps ? Number(item.reps) : null,
-				})),
-				doneAerobic,
-				doneBalance,
-				doneStrength,
-				createdAt: new Date().toISOString(),
-			});
+		const before = await getWeeklyProgress();
+		await saveSession(session);
+		await trackSessionCompleted(session.mode);
+		const after = await getWeeklyProgress();
 
-			Alert.alert("", i18n.t("sessionSaved"), [
-				{ text: "OK", onPress: () => router.replace("/(tabs)") },
-			]);
-		} catch (error) {
-			console.error("Error saving session", error);
-			Alert.alert(i18n.t("warning"), String(error?.message || error));
-		} finally {
-			setSaving(false);
-		}
+		// Count newly achieved preset/WHO goals (App Upgrade #4)
+		let newlyAchieved = 0;
+		["aerobic", "balance", "muscle"].forEach((t) => {
+			const wasAchieved = before.progress[t] >= before.targets[t];
+			const isAchieved = after.progress[t] >= after.targets[t];
+			if (!wasAchieved && isAchieved) newlyAchieved += 1;
+		});
+		if (newlyAchieved > 0) await trackGoalAchieved(newlyAchieved);
+
+		const message = newlyAchieved > 0 ? `${i18n.t("sessionSaved")}\n${i18n.t("goalAchievedMsg")}` : i18n.t("sessionSaved");
+		showAlert("", message, [{ text: "OK", onPress: () => router.replace("/(tabs)") }]);
 	};
 
-	const checkboxItems = useMemo(
-		() => [
-			{
-				key: "aerobic",
-				label: i18n.t("doneAerobic"),
-				value: doneAerobic,
-				setter: setDoneAerobic,
-				icon: ACTIVITY_TYPE_ICONS.aerobic,
-			},
-			{
-				key: "balance",
-				label: i18n.t("doneBalance"),
-				value: doneBalance,
-				setter: setDoneBalance,
-				icon: ACTIVITY_TYPE_ICONS.balance,
-			},
-			{
-				key: "strength",
-				label: i18n.t("doneStrength"),
-				value: doneStrength,
-				setter: setDoneStrength,
-				icon: ACTIVITY_TYPE_ICONS.strength,
-			},
-		],
-		[doneAerobic, doneBalance, doneStrength, i18n]
-	);
-
 	return (
-		<>
-			<ScrollView
-				style={styles.scroll}
-				contentContainerStyle={[styles.container, { paddingBottom: bottomInset + 20 }]}
-				keyboardShouldPersistTaps="handled"
-			>
-				<View style={styles.card}>
-					<Text style={styles.metaLabel}>{i18n.t("sessionCompletedAt")}</Text>
-					<Text style={styles.metaValue}>{formatDateTime(endedAt, locale)}</Text>
-					<Text style={styles.metaLabel}>{i18n.t("sessionDuration")}</Text>
-					<Text style={styles.metaValue}>{formatDuration(durationSec)}</Text>
-					<Text style={styles.metaLabel}>{i18n.t("sessionType")}</Text>
-					<Text style={styles.metaValue}>
-						{sessionType === "home" ? i18n.t("sessionTypeHome") : i18n.t("sessionTypeOutdoor")}
-					</Text>
+		<KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+			<ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: hp("18%") }}>
+				{/* Date and time of session completion */}
+				<View style={styles.block}>
+					<Text style={styles.blockLabel}>{i18n.t("completionTime")}</Text>
+					<Text style={styles.blockValue}>{formatDateTime(completedAt, locale)}</Text>
 				</View>
 
-				<View style={styles.card}>
-					<Text style={styles.sectionTitle}>{i18n.t("emotionScale")}</Text>
-					<Text style={styles.hint}>{i18n.t("emotionHint")}</Text>
-					<Text style={styles.scaleValue}>{Math.round(emotion)}</Text>
-					<Slider
-						style={styles.slider}
-						minimumValue={1}
-						maximumValue={5}
-						step={1}
-						value={emotion}
-						onValueChange={setEmotion}
-						minimumTrackTintColor="#840B1C"
-						maximumTrackTintColor="#ddd"
-					/>
+				{/* Total session duration */}
+				<View style={styles.block}>
+					<Text style={styles.blockLabel}>{i18n.t("totalDuration")}</Text>
+					<Text style={styles.duration}>{formatDuration(Number(durationSec) || 0)}</Text>
 				</View>
 
-				<View style={styles.card}>
-					<Text style={styles.sectionTitle}>{i18n.t("rpeScale")}</Text>
-					<Text style={styles.hint}>{i18n.t("rpeHint")}</Text>
-					<Text style={styles.scaleValue}>{Math.round(rpe)}</Text>
-					<Slider
-						style={styles.slider}
-						minimumValue={1}
-						maximumValue={10}
-						step={1}
-						value={rpe}
-						onValueChange={setRpe}
-						minimumTrackTintColor="#840B1C"
-						maximumTrackTintColor="#ddd"
-					/>
-				</View>
-
-				{weeklyProgress ? (
-					<WeeklyGoalProgress progress={weeklyProgress} showCalendar={false} compact />
-				) : (
-					<View style={styles.card}>
-						<Text style={styles.sectionTitle}>{i18n.t("goalProgressTitle")}</Text>
+				{/* Emotion scale */}
+				<View style={styles.block}>
+					<Text style={styles.blockLabel}>{i18n.t("emotionScale")}</Text>
+					<View style={styles.emotionRow}>
+						{EMOTIONS.map((e) => (
+							<TouchableOpacity
+								key={e.value}
+								style={[styles.emotionBtn, emotion === e.value && styles.emotionSelected]}
+								onPress={() => setEmotion(e.value)}
+							>
+								<Text style={styles.emoji}>{e.emoji}</Text>
+							</TouchableOpacity>
+						))}
 					</View>
-				)}
+				</View>
 
-				<TouchableOpacity style={styles.showMoreButton} onPress={() => setShowMore((value) => !value)}>
-					<Text style={styles.showMoreText}>{showMore ? i18n.t("hideMore") : i18n.t("showMore")}</Text>
-					<Ionicons name={showMore ? "chevron-up" : "chevron-down"} size={18} color="#840B1C" />
+				{/* Rate of perceived exertion scale */}
+				<View style={styles.block}>
+					<Text style={styles.blockLabel}>{i18n.t("rpeScale")}</Text>
+					<View style={styles.rpeRow}>
+						{RPE_VALUES.map((v) => (
+							<TouchableOpacity
+								key={v}
+								style={[styles.rpeBtn, rpe === v && styles.rpeSelected]}
+								onPress={() => setRpe(v)}
+							>
+								<Text style={[styles.rpeText, rpe === v && styles.rpeTextSelected]}>{v}</Text>
+							</TouchableOpacity>
+						))}
+					</View>
+				</View>
+
+				{/* Show more button */}
+				<TouchableOpacity style={styles.showMoreBtn} onPress={() => setShowMore((s) => !s)}>
+					<Text style={styles.showMoreText}>{showMore ? i18n.t("showLess") : i18n.t("showMore")}</Text>
+					<Ionicons name={showMore ? "chevron-up" : "chevron-down"} size={RFValue(18)} color="#840B1C" />
 				</TouchableOpacity>
 
 				{showMore && (
-					<>
-						<View style={styles.card}>
-							<Text style={styles.sectionTitle}>{i18n.t("sessionJournal")}</Text>
+					<View>
+						{/* Session journal */}
+						<View style={styles.block}>
+							<Text style={styles.blockLabel}>{i18n.t("sessionJournal")}</Text>
 							<TextInput
 								style={styles.journalInput}
+								placeholder={i18n.t("journalPlaceholder")}
 								value={journal}
 								onChangeText={setJournal}
 								multiline
-								placeholder={i18n.t("sessionJournalPlaceholder")}
-								placeholderTextColor="#999"
 							/>
 						</View>
 
-						<View style={styles.card}>
-							<Text style={styles.sectionTitle}>{i18n.t("exerciseRecords")}</Text>
-							{exercises.map((item) => {
-								const iconSource = getEquipmentIcon(equipmentList, item.equipmentId);
-								return (
-									<View key={item.id} style={styles.exerciseRow}>
-										{iconSource ? <Image source={iconSource} style={styles.exerciseThumb} /> : null}
-										<View style={styles.exerciseInfo}>
-											<Text style={styles.exerciseName}>{item.name}</Text>
+						{/* Exercise type record (photo recognition + manual reps) */}
+						<View style={styles.block}>
+							<Text style={styles.blockLabel}>{i18n.t("exerciseTypeRecord")}</Text>
+							<Text style={styles.hint}>{i18n.t("exerciseTypeRecordHint")}</Text>
+							{mode !== "home" && (
+								<TouchableOpacity style={styles.photoBtn} onPress={handleTakePhoto}>
+									<Ionicons name="camera" size={RFValue(20)} color="#fff" />
+									<Text style={styles.photoBtnText}>{i18n.t("takePhoto")}</Text>
+								</TouchableOpacity>
+							)}
+							<TouchableOpacity style={styles.addManualBtn} onPress={() => setPickerVisible(true)}>
+								<Ionicons name="add-circle-outline" size={RFValue(20)} color="#840B1C" />
+								<Text style={styles.addManualText}>{i18n.t("addExercise")}</Text>
+							</TouchableOpacity>
+
+							{exercises.length > 0 && (
+								<View style={styles.table}>
+									{exercises.map((ex, index) => (
+										<View key={index} style={styles.tableRow}>
+											<Text style={styles.tableName} numberOfLines={2}>
+												{ex.name}
+											</Text>
 											<TextInput
 												style={styles.repsInput}
-												value={item.reps}
-												onChangeText={(text) => updateReps(item.id, text.replace(/[^0-9]/g, ""))}
+												placeholder={i18n.t("reps")}
+												value={ex.reps}
+												onChangeText={(v) => updateReps(index, v)}
 												keyboardType="number-pad"
-												placeholder={i18n.t("repsPlaceholder")}
-												placeholderTextColor="#999"
 											/>
-											<TouchableOpacity onPress={() => removeExercise(item.id)}>
-												<Text style={styles.removeText}>{i18n.t("removeExercise")}</Text>
+											<TouchableOpacity onPress={() => removeExercise(index)}>
+												<Ionicons name="trash-outline" size={RFValue(20)} color="#B00020" />
 											</TouchableOpacity>
 										</View>
-									</View>
-								);
-							})}
-							{sessionType !== "home" && (
-								<TouchableOpacity style={styles.addButton} onPress={() => setPickerVisible(true)}>
-									<Ionicons name="add-circle-outline" size={20} color="#840B1C" />
-									<Text style={styles.addButtonText}>{i18n.t("addExercise")}</Text>
-								</TouchableOpacity>
+									))}
+								</View>
 							)}
 						</View>
 
-						<View style={styles.card}>
-							<Text style={styles.sectionTitle}>{i18n.t("activityTypesDone")}</Text>
-							{checkboxItems.map((item) => (
-								<TouchableOpacity
-									key={item.key}
-									style={styles.checkboxRow}
-									onPress={() => item.setter(!item.value)}
-								>
-									<Image source={item.icon} style={styles.activityIcon} />
+						{/* Three checkboxes: auto-filled from the table, manual for home users */}
+						<View style={styles.block}>
+							<Text style={styles.blockLabel}>{i18n.t("typeChecklist")}</Text>
+							{[
+								{ key: "aerobic", label: i18n.t("aerobicDone") },
+								{ key: "balance", label: i18n.t("balanceDone") },
+								{ key: "muscle", label: i18n.t("muscleDone") },
+							].map(({ key, label }) => (
+								<TouchableOpacity key={key} style={styles.checkRow} onPress={() => toggleType(key)}>
 									<Ionicons
-										name={item.value ? "checkbox" : "square-outline"}
-										size={24}
-										color="#840B1C"
+										name={types[key] ? "checkbox" : "square-outline"}
+										size={RFValue(24)}
+										color={types[key] ? "#2E8B57" : "#888"}
 									/>
-									<Text style={styles.checkboxLabel}>{item.label}</Text>
+									<Text style={styles.checkLabel}>{label}</Text>
 								</TouchableOpacity>
 							))}
 						</View>
-					</>
+					</View>
 				)}
 
-				<TouchableOpacity
-					style={[styles.saveButton, saving && styles.buttonDisabled]}
-					onPress={handleSave}
-					disabled={saving}
-				>
-					<Text style={styles.saveButtonText}>{i18n.t("saveAndContinue")}</Text>
+				{/* Progress bars for three preset goals */}
+				<View style={styles.block}>
+					<Text style={styles.blockLabel}>{i18n.t("weeklyGoalProgress")}</Text>
+					{weekly && <GoalProgressBars i18n={i18n} progress={weekly.progress} targets={weekly.targets} />}
+				</View>
+
+				{/* Save and continue */}
+				<TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
+					<Text style={styles.saveBtnText}>{i18n.t("saveAndContinue")}</Text>
 				</TouchableOpacity>
 			</ScrollView>
 
-			<Modal visible={pickerVisible} animationType="slide" onRequestClose={() => setPickerVisible(false)}>
-				<View style={styles.modalContainer}>
-					<View style={styles.modalHeader}>
-						<Text style={styles.modalTitle}>{i18n.t("selectEquipment")}</Text>
-						<TouchableOpacity onPress={() => setPickerVisible(false)}>
-							<Ionicons name="close" size={28} color="#333" />
+			{/* Equipment picker modal (confirms photo "recognition") */}
+			<Modal visible={pickerVisible} animationType="slide" transparent onRequestClose={() => setPickerVisible(false)}>
+				<View style={styles.modalOverlay}>
+					<View style={styles.modalBox}>
+						<Text style={styles.modalTitle}>{i18n.t("chooseEquipment")}</Text>
+						{photoUri && <Image source={{ uri: photoUri }} style={styles.photoPreview} />}
+						<FlatList
+							data={equipmentData}
+							keyExtractor={(item) => item.id.toString()}
+							renderItem={({ item }) => (
+								<TouchableOpacity style={styles.modalItem} onPress={() => handleSelectEquipment(item)}>
+									<Image source={item.icon} style={styles.modalIcon} />
+									<Text style={styles.modalItemText} numberOfLines={2}>
+										{item.name}
+									</Text>
+								</TouchableOpacity>
+							)}
+						/>
+						<TouchableOpacity style={styles.modalClose} onPress={() => setPickerVisible(false)}>
+							<Text style={styles.modalCloseText}>{i18n.t("cancel")}</Text>
 						</TouchableOpacity>
 					</View>
-					<ScrollView contentContainerStyle={styles.modalList}>
-						{equipmentList.map((item) => (
-							<TouchableOpacity key={item.id} style={styles.modalItem} onPress={() => handleAddEquipment(item)}>
-								{item.icon ? <Image source={item.icon} style={styles.modalThumb} /> : null}
-								<Text style={styles.modalItemText}>{item.name}</Text>
-							</TouchableOpacity>
-						))}
-					</ScrollView>
 				</View>
 			</Modal>
-		</>
+		</KeyboardAvoidingView>
 	);
-}
+};
 
 const styles = StyleSheet.create({
-	scroll: {
-		flex: 1,
-		backgroundColor: "#f7f7f7",
-	},
 	container: {
-		padding: wp("5%"),
-	},
-	card: {
+		flex: 1,
 		backgroundColor: "#fff",
-		borderRadius: 12,
-		padding: 16,
-		marginBottom: 12,
+		paddingHorizontal: wp("5%"),
 	},
-	metaLabel: {
-		fontSize: RFValue(12),
-		color: "#888",
-		marginTop: 6,
+	block: {
+		marginTop: hp("2.5%"),
 	},
-	metaValue: {
+	blockLabel: {
 		fontSize: RFValue(16),
-		fontWeight: "600",
-		color: "#333",
-		marginTop: 2,
-	},
-	sectionTitle: {
-		fontSize: RFValue(15),
 		fontWeight: "bold",
 		color: "#333",
-		marginBottom: 6,
-	},
-	hint: {
-		fontSize: RFValue(12),
-		color: "#777",
 		marginBottom: 8,
 	},
-	scaleValue: {
-		fontSize: RFValue(28),
+	blockValue: {
+		fontSize: RFValue(16),
+		color: "#555",
+	},
+	duration: {
+		fontSize: RFValue(40),
 		fontWeight: "bold",
 		color: "#840B1C",
-		textAlign: "center",
+		fontVariant: ["tabular-nums"],
 	},
-	slider: {
-		width: "100%",
-		height: 40,
+	emotionRow: {
+		flexDirection: "row",
+		justifyContent: "space-between",
 	},
-	progressPlaceholder: {
-		gap: 8,
-		marginTop: 8,
+	emotionBtn: {
+		padding: 8,
+		borderRadius: 12,
+		borderWidth: 2,
+		borderColor: "transparent",
 	},
-	progressBar: {
-		height: 10,
-		width: "70%",
-		borderRadius: 6,
-		backgroundColor: "#E8CCB0",
+	emotionSelected: {
+		borderColor: "#840B1C",
+		backgroundColor: "#FBEAEA",
 	},
-	showMoreButton: {
+	emoji: {
+		fontSize: RFValue(30),
+	},
+	rpeRow: {
+		flexDirection: "row",
+		flexWrap: "wrap",
+		gap: 6,
+	},
+	rpeBtn: {
+		width: RFValue(36),
+		height: RFValue(36),
+		borderRadius: RFValue(18),
+		borderWidth: 1,
+		borderColor: "#ccc",
+		justifyContent: "center",
+		alignItems: "center",
+		margin: 3,
+	},
+	rpeSelected: {
+		backgroundColor: "#840B1C",
+		borderColor: "#840B1C",
+	},
+	rpeText: {
+		fontSize: RFValue(15),
+		color: "#555",
+	},
+	rpeTextSelected: {
+		color: "#fff",
+		fontWeight: "bold",
+	},
+	showMoreBtn: {
 		flexDirection: "row",
 		alignItems: "center",
 		justifyContent: "center",
+		marginTop: hp("3%"),
+		paddingVertical: 12,
+		borderWidth: 1.5,
+		borderColor: "#840B1C",
+		borderRadius: 12,
 		gap: 6,
-		paddingVertical: 10,
-		marginBottom: 8,
 	},
 	showMoreText: {
 		color: "#840B1C",
-		fontSize: RFValue(14),
+		fontSize: RFValue(15),
 		fontWeight: "bold",
+		marginRight: 4,
 	},
 	journalInput: {
-		minHeight: 90,
 		borderWidth: 1,
-		borderColor: "#ddd",
-		borderRadius: 10,
+		borderColor: "#ccc",
+		borderRadius: 12,
 		padding: 12,
+		minHeight: hp("12%"),
+		fontSize: RFValue(15),
 		textAlignVertical: "top",
-		fontSize: RFValue(14),
-		color: "#333",
+		backgroundColor: "#f8f9fa",
 	},
-	exerciseRow: {
+	hint: {
+		fontSize: RFValue(12),
+		color: "#888",
+		marginBottom: 10,
+		lineHeight: RFValue(18),
+	},
+	photoBtn: {
 		flexDirection: "row",
-		alignItems: "flex-start",
-		borderBottomWidth: 1,
-		borderBottomColor: "#eee",
-		paddingVertical: 12,
-		gap: 12,
-	},
-	exerciseThumb: {
-		width: 64,
-		height: 64,
-		borderRadius: 10,
-		backgroundColor: "#f0f0f0",
-	},
-	exerciseInfo: {
-		flex: 1,
+		alignItems: "center",
+		justifyContent: "center",
+		backgroundColor: "#2E8B57",
+		borderRadius: 12,
+		paddingVertical: 14,
 		gap: 8,
+		marginBottom: 10,
 	},
-	exerciseName: {
+	photoBtnText: {
+		color: "#fff",
+		fontSize: RFValue(15),
+		fontWeight: "bold",
+		marginLeft: 6,
+	},
+	addManualBtn: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		paddingVertical: 12,
+		gap: 6,
+	},
+	addManualText: {
+		color: "#840B1C",
 		fontSize: RFValue(14),
 		fontWeight: "600",
+		marginLeft: 4,
+	},
+	table: {
+		marginTop: 6,
+		borderWidth: 1,
+		borderColor: "#eee",
+		borderRadius: 12,
+		overflow: "hidden",
+	},
+	tableRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		padding: 12,
+		borderBottomWidth: 1,
+		borderBottomColor: "#eee",
+		gap: 8,
+	},
+	tableName: {
+		flex: 1,
+		fontSize: RFValue(14),
 		color: "#333",
 	},
 	repsInput: {
+		width: wp("18%"),
 		borderWidth: 1,
-		borderColor: "#ddd",
+		borderColor: "#ccc",
 		borderRadius: 8,
-		paddingHorizontal: 10,
-		paddingVertical: 8,
+		padding: 8,
 		fontSize: RFValue(14),
+		textAlign: "center",
+		marginHorizontal: 8,
 	},
-	removeText: {
-		color: "#840B1C",
-		fontSize: RFValue(12),
-	},
-	addButton: {
+	checkRow: {
 		flexDirection: "row",
 		alignItems: "center",
-		gap: 6,
-		marginTop: 12,
-	},
-	addButtonText: {
-		color: "#840B1C",
-		fontSize: RFValue(14),
-		fontWeight: "600",
-	},
-	checkboxRow: {
-		flexDirection: "row",
-		alignItems: "center",
-		gap: 10,
 		paddingVertical: 10,
 	},
-	activityIcon: {
-		width: 36,
-		height: 36,
-		resizeMode: "contain",
-	},
-	checkboxLabel: {
-		fontSize: RFValue(14),
+	checkLabel: {
+		fontSize: RFValue(15),
 		color: "#333",
-		flex: 1,
+		marginLeft: 10,
 	},
-	saveButton: {
+	saveBtn: {
 		backgroundColor: "#840B1C",
 		borderRadius: 50,
-		paddingVertical: 16,
+		paddingVertical: hp("2.2%"),
 		alignItems: "center",
-		marginTop: 8,
+		marginTop: hp("4%"),
 	},
-	saveButtonText: {
+	saveBtnText: {
 		color: "#fff",
-		fontSize: RFValue(16),
-		fontWeight: "bold",
-	},
-	buttonDisabled: {
-		opacity: 0.7,
-	},
-	modalContainer: {
-		flex: 1,
-		backgroundColor: "#fff",
-		paddingTop: 50,
-	},
-	modalHeader: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		paddingHorizontal: 20,
-		paddingBottom: 12,
-		borderBottomWidth: 1,
-		borderBottomColor: "#eee",
-	},
-	modalTitle: {
 		fontSize: RFValue(18),
 		fontWeight: "bold",
 	},
-	modalList: {
-		padding: 16,
+	modalOverlay: {
+		flex: 1,
+		backgroundColor: "rgba(0,0,0,0.5)",
+		justifyContent: "flex-end",
+	},
+	modalBox: {
+		backgroundColor: "#fff",
+		borderTopLeftRadius: 20,
+		borderTopRightRadius: 20,
+		padding: 20,
+		maxHeight: hp("70%"),
+	},
+	modalTitle: {
+		fontSize: RFValue(17),
+		fontWeight: "bold",
+		marginBottom: 12,
+		textAlign: "center",
+	},
+	photoPreview: {
+		width: "100%",
+		height: hp("15%"),
+		borderRadius: 12,
+		marginBottom: 12,
+		resizeMode: "cover",
 	},
 	modalItem: {
 		flexDirection: "row",
 		alignItems: "center",
-		gap: 12,
-		paddingVertical: 12,
+		paddingVertical: 10,
 		borderBottomWidth: 1,
-		borderBottomColor: "#f0f0f0",
+		borderBottomColor: "#eee",
 	},
-	modalThumb: {
-		width: 52,
-		height: 52,
+	modalIcon: {
+		width: RFValue(44),
+		height: RFValue(44),
 		borderRadius: 8,
-		backgroundColor: "#f0f0f0",
+		marginRight: 12,
 	},
 	modalItemText: {
 		flex: 1,
-		fontSize: RFValue(15),
+		fontSize: RFValue(14),
 		color: "#333",
 	},
+	modalClose: {
+		paddingVertical: 14,
+		alignItems: "center",
+	},
+	modalCloseText: {
+		color: "#840B1C",
+		fontSize: RFValue(15),
+		fontWeight: "bold",
+	},
 });
+
+export default SessionSummary;

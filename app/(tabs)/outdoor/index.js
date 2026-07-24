@@ -1,18 +1,14 @@
 import React, { useContext } from "react";
 import { router } from "expo-router";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { Platform, StyleSheet, View, Text, TouchableOpacity, Image, ScrollView } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { StyleSheet, View, Text, TouchableOpacity, Image, Dimensions, ScrollView } from "react-native";
+import CustomBackButton from "../../../components/CustomBackButton";
 import { LocaleContext } from "../../../contexts/LocaleContext";
-import { widthPercentageToDP as wp } from "react-native-responsive-screen";
+import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
 import { RFValue } from "react-native-responsive-fontsize";
-
-const TAB_BAR_HEIGHT = 100;
 
 export default function Outdoor() {
 	const { i18n } = useContext(LocaleContext);
-	const insets = useSafeAreaInsets();
-	const bottomInset =
-		Platform.OS === "ios" ? TAB_BAR_HEIGHT + Math.max(insets.bottom, 8) : Math.max(insets.bottom, 16);
 
 	const buttons = [
 		{ icon: require("@/assets/icons/outdoor/list.png"), text: i18n.t("all"), category: "all" },
@@ -28,8 +24,9 @@ export default function Outdoor() {
 	];
 
 	return (
-		<SafeAreaView style={styles.container} edges={["bottom"]}>
-			<ScrollView contentContainerStyle={[styles.scrollViewContent, { paddingBottom: bottomInset }]}>
+		<SafeAreaView style={styles.container}>
+			<CustomBackButton text={i18n.t("back")} />
+			<ScrollView contentContainerStyle={styles.scrollViewContent}>
 				<View style={styles.buttonsContainer}>
 					{buttons.map((button, index) => (
 						<View key={index} style={styles.buttonWrapper}>
@@ -61,6 +58,7 @@ const styles = StyleSheet.create({
 	scrollViewContent: {
 		flexGrow: 1,
 		alignItems: "center",
+		paddingBottom: hp("15%"),
 	},
 	buttonsContainer: {
 		flexDirection: "row",

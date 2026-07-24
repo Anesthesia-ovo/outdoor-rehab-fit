@@ -3,10 +3,28 @@ import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
+import { useContext, useEffect } from "react";
+import { View } from "react-native";
 import "react-native-reanimated";
 import { LocaleProvider } from "@/contexts/LocaleContext";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, AuthContext } from "@/contexts/AuthContext";
+import { ensurePlaybackAudioMode } from "@/utils/audioMode";
+
+// Captures every touch to reset the 1.5h inactivity auto-logout timer (App Upgrade #4)
+function ActivityTracker({ children }) {
+	const { recordActivity } = useContext(AuthContext);
+	return (
+		<View
+			style={{ flex: 1 }}
+			onStartShouldSetResponderCapture={() => {
+				recordActivity();
+				return false;
+			}}
+		>
+			{children}
+		</View>
+	);
+}
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -19,6 +37,7 @@ export default function RootLayout() {
 	useEffect(() => {
 		if (loaded) {
 			SplashScreen.hideAsync();
+			ensurePlaybackAudioMode();
 		}
 	}, [loaded]);
 
@@ -30,30 +49,21 @@ export default function RootLayout() {
 		<LocaleProvider>
 			<AuthProvider>
 				<ThemeProvider value={DefaultTheme}>
-					<Stack
-						screenOptions={{
-							gestureEnabled: true,
-							fullScreenGestureEnabled: true,
-							animation: "slide_from_right",
-						}}
-					>
-						<Stack.Screen
-							name="index"
-							options={{ headerShown: false, headerTitle: "Home", gestureEnabled: false }}
-						/>
-						<Stack.Screen name="login" options={{ headerShown: false, gestureEnabled: false }} />
-						<Stack.Screen name="register" options={{ headerShown: false }} />
-						<Stack.Screen name="forgot-password" options={{ headerShown: false }} />
-						{/* Prevent swipe-back from main app to Start/Login cover */}
-						<Stack.Screen
-							name="(tabs)"
-							options={{ headerShown: false, headerTitle: "Home", gestureEnabled: false }}
-						/>
-						<Stack.Screen name="firstdisclaimer" options={{ headerShown: false, gestureEnabled: false }} />
-						<Stack.Screen name="firstsafety" options={{ headerShown: false, gestureEnabled: false }} />
-						<Stack.Screen name="firstquestionnaire" options={{ title: "PAR-Q", gestureEnabled: false }} />
-						<Stack.Screen name="+not-found" />
-					</Stack>
+					<ActivityTracker>
+						<Stack>
+							<Stack.Screen name="index" options={{ headerShown: false, headerTitle: "Home" }} />
+							{/* gestureEnabled: false prevents the iOS swipe-back gesture from
+							    returning to the onboarding / Start screens */}
+							<Stack.Screen name="(tabs)" options={{ headerShown: false, headerTitle: "Home", gestureEnabled: false }} />
+							<Stack.Screen name="login" options={{ headerShown: false, gestureEnabled: false }} />
+							<Stack.Screen name="register" options={{ headerShown: false }} />
+							<Stack.Screen name="forgot-password" options={{ headerShown: false }} />
+							<Stack.Screen name="firstdisclaimer" options={{ headerShown: false, gestureEnabled: false }} />
+							<Stack.Screen name="firstsafety" options={{ headerShown: false, gestureEnabled: false }} />
+							<Stack.Screen name="firstquestionnaire" options={{ title: "PAR-Q", gestureEnabled: false, headerBackVisible: false }} />
+							<Stack.Screen name="+not-found" />
+						</Stack>
+					</ActivityTracker>
 					<StatusBar style="auto" />
 				</ThemeProvider>
 			</AuthProvider>

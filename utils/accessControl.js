@@ -1,9 +1,9 @@
-import { Alert } from "react-native";
 import { router } from "expo-router";
 import { canAccess } from "../constants/permissions";
+import { showAlert } from "./alert";
 
 export function showGuestRestrictionAlert(i18n) {
-	Alert.alert(i18n.t("guestRestrictedTitle"), i18n.t("guestRestrictedMessage"), [
+	showAlert(i18n.t("guestRestrictedTitle"), i18n.t("guestRestrictedMessage"), [
 		{ text: i18n.t("cancel"), style: "cancel" },
 		{
 			text: i18n.t("loginNow"),

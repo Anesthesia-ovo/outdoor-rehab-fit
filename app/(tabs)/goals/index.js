@@ -1,183 +1,177 @@
+// App Upgrade #6: Goal setting - 3 preset weekly goals + SMART goal entry
 import React, { useCallback, useContext, useState } from "react";
-import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { router, useFocusEffect, useNavigation } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { StyleSheet, View, Text, TouchableOpacity, ScrollView } from "react-native";
+import { router, useFocusEffect } from "expo-router";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { RFValue } from "react-native-responsive-fontsize";
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
 import { LocaleContext } from "../../../contexts/LocaleContext";
-import { useAuth } from "../../../contexts/AuthContext";
-import { showGuestRestrictionAlert } from "../../../utils/accessControl";
-import {
-	GOAL_TYPES,
-	confirmGoalsForCurrentWeek,
-	getGoalsForUser,
-	needsWeekCarryPrompt,
-} from "../../../utils/goalStorage";
-import { getOwnerKey } from "../../../utils/sessionStorage";
+import { getGoalState, setTarget, getWeeklyProgress, getCurrentWeekSmartGoals } from "../../../utils/goals";
 
-const TAB_BAR_HEIGHT = 100;
+const TYPES = [
+	{ key: "aerobic", labelKey: "aerobicGoal", icon: "run", color: "#F0E4C2" },
+	{ key: "balance", labelKey: "balanceGoal", icon: "scale-balance", color: "#F2CCC0" },
+	{ key: "muscle", labelKey: "muscleGoal", icon: "arm-flex", color: "#E8CCB0" },
+];
 
-export default function GoalsHubScreen() {
+const GoalSetting = () => {
 	const { i18n } = useContext(LocaleContext);
-	const { user, isGuest } = useAuth();
-	const navigation = useNavigation();
-	const insets = useSafeAreaInsets();
-	const bottomInset =
-		Platform.OS === "ios" ? TAB_BAR_HEIGHT + Math.max(insets.bottom, 8) : Math.max(insets.bottom, 16);
-	const [targets, setTargets] = useState(null);
+	const [targets, setTargets] = useState({ aerobic: 5, balance: 3, muscle: 2 });
+	const [progress, setProgress] = useState({ aerobic: 0, balance: 0, muscle: 0 });
+	const [smartCount, setSmartCount] = useState(0);
+	const [expanded, setExpanded] = useState(null);
+
+	const load = useCallback(async () => {
+		const [state, weekly] = await Promise.all([getGoalState(), getWeeklyProgress()]);
+		setTargets(state.targets);
+		setProgress(weekly.progress);
+		setSmartCount(getCurrentWeekSmartGoals(state).length);
+	}, []);
 
 	useFocusEffect(
 		useCallback(() => {
-			navigation.setOptions({ headerTitle: i18n.t("goalHubTitle") });
-
-			if (isGuest) {
-				showGuestRestrictionAlert(i18n);
-				router.replace("/(tabs)");
-				return;
-			}
-
-			const load = async () => {
-				const ownerKey = getOwnerKey(user);
-				const goals = await getGoalsForUser(ownerKey);
-				setTargets(goals?.targets || null);
-
-				if (needsWeekCarryPrompt(goals)) {
-					Alert.alert(i18n.t("goalCarryTitle"), i18n.t("goalCarryMessage"), [
-						{
-							text: i18n.t("goalCarryEdit"),
-							style: "cancel",
-							onPress: () => confirmGoalsForCurrentWeek(ownerKey),
-						},
-						{
-							text: i18n.t("goalCarryKeep"),
-							onPress: () => confirmGoalsForCurrentWeek(ownerKey),
-						},
-					]);
-				}
-			};
 			load();
-		}, [i18n, isGuest, navigation, user])
+		}, [load])
 	);
 
-	const options = [
-		{
-			key: GOAL_TYPES.AEROBIC,
-			title: i18n.t("goalAerobic"),
-			subtitle: i18n.t("goalAerobicHint"),
-			icon: "walk",
-			color: "#840B1C",
-			route: { pathname: "/goals/edit-preset", params: { type: GOAL_TYPES.AEROBIC } },
-			meta: targets ? `${targets[GOAL_TYPES.AEROBIC]} ${i18n.t("goalDaysUnit")}` : "",
-		},
-		{
-			key: GOAL_TYPES.BALANCE,
-			title: i18n.t("goalBalance"),
-			subtitle: i18n.t("goalBalanceHint"),
-			icon: "body",
-			color: "#5C7AEA",
-			route: { pathname: "/goals/edit-preset", params: { type: GOAL_TYPES.BALANCE } },
-			meta: targets ? `${targets[GOAL_TYPES.BALANCE]} ${i18n.t("goalDaysUnit")}` : "",
-		},
-		{
-			key: GOAL_TYPES.STRENGTH,
-			title: i18n.t("goalStrength"),
-			subtitle: i18n.t("goalStrengthHint"),
-			icon: "barbell",
-			color: "#2A9D8F",
-			route: { pathname: "/goals/edit-preset", params: { type: GOAL_TYPES.STRENGTH } },
-			meta: targets ? `${targets[GOAL_TYPES.STRENGTH]} ${i18n.t("goalDaysUnit")}` : "",
-		},
-		{
-			key: "smart",
-			title: i18n.t("goalSmart"),
-			subtitle: i18n.t("goalSmartHint"),
-			icon: "bulb",
-			color: "#E9C46A",
-			route: "/goals/smart",
-			meta: "",
-		},
-	];
+	const adjust = async (type, delta) => {
+		const next = Math.min(7, Math.max(1, targets[type] + delta));
+		setTargets({ ...targets, [type]: next });
+		await setTarget(type, next);
+	};
 
 	return (
-		<View style={[styles.container, { paddingBottom: bottomInset }]}>
-			<Text style={styles.subtitle}>{i18n.t("goalHubSubtitle")}</Text>
-			{options.map((option) => (
-				<TouchableOpacity
-					key={option.key}
-					style={styles.card}
-					activeOpacity={0.85}
-					onPress={() => router.push(option.route)}
-				>
-					<View style={[styles.iconWrap, { backgroundColor: option.color }]}>
-						<Ionicons name={option.icon} size={RFValue(28)} color="#fff" />
+		<ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: hp("15%") }}>
+			<Text style={styles.sectionTitle}>{i18n.t("presetGoals")}</Text>
+			<Text style={styles.hint}>{i18n.t("adjustTarget")}</Text>
+
+			{TYPES.map((type) => {
+				const isOpen = expanded === type.key;
+				return (
+					<View key={type.key} style={[styles.card, { backgroundColor: type.color }]}>
+						<TouchableOpacity style={styles.cardHeader} onPress={() => setExpanded(isOpen ? null : type.key)}>
+							<MaterialCommunityIcons name={type.icon} size={RFValue(28)} color="#333" />
+							<View style={{ flex: 1, marginLeft: 12 }}>
+								<Text style={styles.cardTitle}>{i18n.t(type.labelKey)}</Text>
+								<Text style={styles.cardSub}>
+									{targets[type.key]} {i18n.t("daysPerWeek")}
+								</Text>
+							</View>
+							<Ionicons name={isOpen ? "chevron-up" : "chevron-down"} size={RFValue(20)} color="#333" />
+						</TouchableOpacity>
+						{isOpen && (
+							<View style={styles.stepperRow}>
+								<Text style={styles.stepperLabel}>{i18n.t("targetDays")}</Text>
+								<View style={styles.stepper}>
+									<TouchableOpacity style={styles.stepBtn} onPress={() => adjust(type.key, -1)}>
+										<Ionicons name="remove" size={RFValue(22)} color="#fff" />
+									</TouchableOpacity>
+									<Text style={styles.stepValue}>{targets[type.key]}</Text>
+									<TouchableOpacity style={styles.stepBtn} onPress={() => adjust(type.key, 1)}>
+										<Ionicons name="add" size={RFValue(22)} color="#fff" />
+									</TouchableOpacity>
+								</View>
+							</View>
+						)}
 					</View>
-					<View style={styles.cardText}>
-						<Text style={styles.cardTitle}>{option.title}</Text>
-						<Text style={styles.cardSubtitle}>{option.subtitle}</Text>
-						{!!option.meta && <Text style={styles.cardMeta}>{option.meta}</Text>}
+				);
+			})}
+
+			<TouchableOpacity style={[styles.card, styles.smartCard]} onPress={() => router.push("/goals/smart")}>
+				<View style={styles.cardHeader}>
+					<MaterialCommunityIcons name="bullseye-arrow" size={RFValue(28)} color="#fff" />
+					<View style={{ flex: 1, marginLeft: 12 }}>
+						<Text style={[styles.cardTitle, { color: "#fff" }]}>{i18n.t("smartGoal")}</Text>
+						<Text style={[styles.cardSub, { color: "#f2f2f2" }]}>
+							{smartCount > 0 ? i18n.t("smartGoals") : i18n.t("noSmartGoals")}
+						</Text>
 					</View>
-					<Ionicons name="chevron-forward" size={RFValue(20)} color="#999" />
-				</TouchableOpacity>
-			))}
-		</View>
+					<Ionicons name="chevron-forward" size={RFValue(20)} color="#fff" />
+				</View>
+			</TouchableOpacity>
+		</ScrollView>
 	);
-}
+};
 
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
 		backgroundColor: "#fff",
-		paddingHorizontal: wp("6%"),
-		paddingTop: hp("3%"),
+		paddingHorizontal: wp("5%"),
 	},
-	subtitle: {
-		fontSize: RFValue(14),
-		color: "#666",
-		lineHeight: RFValue(22),
-		marginBottom: hp("3%"),
+	sectionTitle: {
+		fontSize: RFValue(20),
+		fontWeight: "bold",
+		marginTop: hp("2%"),
+		color: "#333",
+	},
+	hint: {
+		fontSize: RFValue(13),
+		color: "#888",
+		marginTop: 4,
+		marginBottom: hp("1.5%"),
 	},
 	card: {
-		flexDirection: "row",
-		alignItems: "center",
-		backgroundColor: "#fff",
-		borderRadius: 16,
+		borderRadius: 14,
 		padding: 16,
-		marginBottom: 14,
-		borderWidth: 1,
-		borderColor: "#eee",
+		marginBottom: hp("1.5%"),
 		shadowColor: "#000",
-		shadowOpacity: 0.08,
-		shadowRadius: 6,
 		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.15,
+		shadowRadius: 4,
 		elevation: 3,
 	},
-	iconWrap: {
-		width: wp("14%"),
-		height: wp("14%"),
-		borderRadius: wp("7%"),
-		justifyContent: "center",
+	cardHeader: {
+		flexDirection: "row",
 		alignItems: "center",
-		marginRight: 14,
-	},
-	cardText: {
-		flex: 1,
 	},
 	cardTitle: {
-		fontSize: RFValue(16),
+		fontSize: RFValue(17),
 		fontWeight: "bold",
 		color: "#333",
 	},
-	cardSubtitle: {
-		marginTop: 4,
-		fontSize: RFValue(12),
-		color: "#777",
-		lineHeight: RFValue(18),
-	},
-	cardMeta: {
-		marginTop: 6,
+	cardSub: {
 		fontSize: RFValue(13),
-		color: "#840B1C",
+		color: "#555",
+		marginTop: 2,
+	},
+	stepperRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "space-between",
+		marginTop: 16,
+		paddingTop: 12,
+		borderTopWidth: 1,
+		borderTopColor: "rgba(0,0,0,0.1)",
+	},
+	stepperLabel: {
+		fontSize: RFValue(14),
+		color: "#333",
 		fontWeight: "600",
 	},
+	stepper: {
+		flexDirection: "row",
+		alignItems: "center",
+	},
+	stepBtn: {
+		backgroundColor: "#840B1C",
+		borderRadius: 20,
+		width: RFValue(34),
+		height: RFValue(34),
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	stepValue: {
+		fontSize: RFValue(20),
+		fontWeight: "bold",
+		marginHorizontal: 20,
+		color: "#333",
+		minWidth: RFValue(24),
+		textAlign: "center",
+	},
+	smartCard: {
+		backgroundColor: "#840B1C",
+	},
 });
+
+export default GoalSetting;

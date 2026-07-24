@@ -2,6 +2,7 @@ import React, { useContext } from "react";
 import { StyleSheet, View, ScrollView, Text, TouchableOpacity, SafeAreaView, Alert } from "react-native";
 import { LocaleContext } from "../contexts/LocaleContext";
 import { router } from "expo-router";
+import { showAlert } from "../utils/alert";
 
 const FirstQuestionnaire = () => {
 	const { i18n } = useContext(LocaleContext);
@@ -15,7 +16,7 @@ const FirstQuestionnaire = () => {
 				<TouchableOpacity
 					style={styles.button}
 					onPress={() => {
-						Alert.alert("", i18n.t("questionnaireNo"), [{ text: "OK", onPress: () => router.replace("/firstsafety") }]);
+						showAlert("", i18n.t("questionnaireNo"), [{ text: "OK", onPress: () => router.replace("/firstsafety") }]);
 					}}
 				>
 					<Text style={styles.buttonText}>{i18n.t("yes")}</Text>
@@ -23,7 +24,7 @@ const FirstQuestionnaire = () => {
 				<TouchableOpacity
 					style={[styles.button, { backgroundColor: "#AAA" }]} //gray button
 					onPress={() => {
-						Alert.alert(i18n.t("warning"), i18n.t("questionnaireYes"), [
+						showAlert(i18n.t("warning"), i18n.t("questionnaireYes"), [
 							{ text: "OK", onPress: () => router.replace("/firstsafety") },
 						]);
 					}}
@@ -58,7 +59,7 @@ const styles = StyleSheet.create({
 		fontSize: 24,
 		lineHeight: 32,
 		color: "#333",
-		textAlign: "center",
+		textAlign: "left",
 	},
 	buttonContainer: {
 		flexDirection: "column",

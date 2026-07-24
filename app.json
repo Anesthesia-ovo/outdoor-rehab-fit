@@ -7,7 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.polyu.rs.outdoorrehabfit",
@@ -24,30 +23,44 @@
     },
     "web": {
       "bundler": "metro",
-      "output": "static",
+      "output": "single",
       "favicon": "./assets/images/favicon.png"
     },
-    "plugins": [
-      "expo-router",
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
-        }
-      ],
-      "expo-localization",
-      [
-        "expo-screen-orientation",
-        {
-          "initialOrientation": "PORTRAIT"
-        }
-      ],
-      "expo-font",
-      "expo-web-browser"
-    ],
+		"plugins": [
+			"expo-router",
+			[
+				"expo-splash-screen",
+				{
+					"image": "./assets/images/splash-icon.png",
+					"imageWidth": 200,
+					"resizeMode": "contain",
+					"backgroundColor": "#ffffff"
+				}
+			],
+			"expo-localization",
+			[
+				"expo-screen-orientation",
+				{
+					"initialOrientation": "PORTRAIT"
+				}
+			],
+			[
+				"expo-image-picker",
+				{
+					"photosPermission": "The app needs photo access so you can share exercise photos to the group.",
+					"cameraPermission": "The app uses the camera to recognize outdoor exercise equipment."
+				}
+			],
+			"expo-asset",
+			[
+				"expo-audio",
+				{
+					"microphonePermission": false,
+					"recordAudioAndroid": false,
+					"enableBackgroundPlayback": false
+				}
+			]
+		],
     "experiments": {
       "typedRoutes": true
     },

@@ -10,6 +10,7 @@ import { guardGuestAccess } from "../../utils/accessControl";
 import { RFValue } from "react-native-responsive-fontsize";
 import WeatherComponent from "../../components/WeatherComponent";
 import GoalProgressBars from "../../components/GoalProgressBars";
+import ManagedContent from "../../components/ManagedContent";
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
 import { trackUsageDay } from "../../utils/usage";
 import { getWeeklyProgress, getGoalState, getCurrentWeekSmartGoals } from "../../utils/goals";
@@ -242,6 +243,7 @@ export default function HomeScreen() {
 					})}
 				</View>
 			</View>
+			<ManagedContent pageKey="home" />
 		</ScrollView>
 	);
 }

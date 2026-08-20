@@ -16,15 +16,18 @@ import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-nat
 import { trackIntroLoad, trackAudioPlay } from "../../../utils/usage";
 import { markRead, markWatched, markListened } from "../../../utils/learning";
 import { showAlert } from "../../../utils/alert";
+import { sendResearchEvent } from "../../../utils/api";
+import ManagedContent from "../../../components/ManagedContent";
 
 const Detail = () => {
 	const { i18n, locale } = useContext(LocaleContext);
-	const { canAccessEquipment, isGuest } = useContext(AuthContext);
+	const { canAccessEquipment, isGuest, user } = useContext(AuthContext);
 	const item = useLocalSearchParams();
 	const navigation = useNavigation();
 
 	const [modalVisible, setModalVisible] = useState(false);
 	const [selectedImage, setSelectedImage] = useState(null);
+	const [videoStartedAt, setVideoStartedAt] = useState(null);
 
 	const openModal = (image) => {
 		setSelectedImage(image);
@@ -65,9 +68,10 @@ const Detail = () => {
 	}, [item.id]);
 	const handleVideoStateChange = useCallback(
 		(state) => {
-			if (state === "playing") markWatched(item.id);
+			if (state === "playing") { markWatched(item.id); setVideoStartedAt(Date.now()); user?.token && sendResearchEvent(user.token, "video.play", { screen: "outdoor.detail", contentId: item.id, videoId: item.youtubeKey }).catch(() => {}); }
+			if (["paused", "ended"].includes(state)) { const watchedMs = videoStartedAt ? Date.now() - videoStartedAt : 0; user?.token && sendResearchEvent(user.token, state === "ended" ? "video.completed" : "video.paused", { screen: "outdoor.detail", contentId: item.id, videoId: item.youtubeKey, watchedMs, completed: state === "ended" }).catch(() => {}); setVideoStartedAt(null); }
 		},
-		[item.id]
+		[item.id, item.youtubeKey, user?.token, videoStartedAt]
 	);
 
 	// The text read aloud by TTS (#11)
@@ -149,6 +153,7 @@ const Detail = () => {
 					</TouchableOpacity>
 				)}
 			</View>
+			<ManagedContent pageKey="outdoor.detail" />
 		</ScrollView>
 	);
 };

@@ -9,21 +9,22 @@ import "react-native-reanimated";
 import { LocaleProvider } from "@/contexts/LocaleContext";
 import { AuthProvider, AuthContext } from "@/contexts/AuthContext";
 import { ensurePlaybackAudioMode } from "@/utils/audioMode";
+import ResearchInteractionTracker from "@/components/ResearchInteractionTracker";
 
 // Captures every touch to reset the 1.5h inactivity auto-logout timer (App Upgrade #4)
 function ActivityTracker({ children }) {
 	const { recordActivity } = useContext(AuthContext);
-	return (
+	return <ResearchInteractionTracker>{(trackResearchTap) => (
 		<View
 			style={{ flex: 1 }}
-			onStartShouldSetResponderCapture={() => {
+			onStartShouldSetResponderCapture={(event) => {
 				recordActivity();
-				return false;
+				return trackResearchTap(event);
 			}}
 		>
 			{children}
 		</View>
-	);
+	)}</ResearchInteractionTracker>;
 }
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -58,6 +59,7 @@ export default function RootLayout() {
 							<Stack.Screen name="login" options={{ headerShown: false, gestureEnabled: false }} />
 							<Stack.Screen name="register" options={{ headerShown: false }} />
 							<Stack.Screen name="forgot-password" options={{ headerShown: false }} />
+							<Stack.Screen name="admin" options={{ headerShown: false }} />
 							<Stack.Screen name="firstdisclaimer" options={{ headerShown: false, gestureEnabled: false }} />
 							<Stack.Screen name="firstsafety" options={{ headerShown: false, gestureEnabled: false }} />
 							<Stack.Screen name="firstquestionnaire" options={{ title: "PAR-Q", gestureEnabled: false, headerBackVisible: false }} />

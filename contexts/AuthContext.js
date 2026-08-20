@@ -9,10 +9,10 @@ import {
 	MIN_PASSWORD_LENGTH,
 	USER_PROFILE_ROLES,
 	isValidEmail,
-	isValidPhone,
-	saveRegisteredUser,
 	validateCredentials,
 } from "../constants/auth";
+import { loginAccount, registerAccount } from "../utils/api";
+import { isValidInternationalPhone } from "../constants/countries";
 import { trackLoginEvent } from "../utils/usage";
 import { clearCurrentOwner, ensureUserFolder } from "../utils/userStorage";
 
@@ -101,24 +101,31 @@ export function AuthProvider({ children }) {
 		setUser(withActivity);
 	};
 
-	const login = useCallback(async (identifier, password) => {
-		const result = await validateCredentials(AsyncStorage, identifier, password);
-		if (!result.valid) {
-			return { success: false, error: result.error || "invalidCredentials" };
+	const login = useCallback(async (identifier, password, countryCode = "+852") => {
+		try {
+			const remote = await loginAccount(identifier, password, countryCode);
+			await persistSession({ ...createUserSession(remote.user), token: remote.token });
+			lastActivityRef.current = Date.now();
+			await trackLoginEvent();
+			return { success: true };
+		} catch (error) {
+			const local = await validateCredentials(AsyncStorage, identifier, password);
+			if (!local.valid) {
+				return { success: false, error: error.code || local.error || "invalidCredentials" };
+			}
+			await persistSession(createUserSession(local.user));
+			lastActivityRef.current = Date.now();
+			await trackLoginEvent();
+			return { success: true };
 		}
-
-		await persistSession(createUserSession(result.user));
-		lastActivityRef.current = Date.now();
-		await trackLoginEvent();
-		return { success: true };
 	}, []);
 
-	const register = useCallback(async ({ name, phone, email, profileRole, password, confirmPassword }) => {
+	const register = useCallback(async ({ name, phone, countryCode, email, profileRole, password, confirmPassword, verificationToken }) => {
 		if (!name?.trim() || !phone?.trim() || !profileRole || !password || !confirmPassword) {
 			return { success: false, error: "registerRequired" };
 		}
 
-		if (!isValidPhone(phone)) {
+		if (!isValidInternationalPhone(phone, countryCode)) {
 			return { success: false, error: "invalidPhone" };
 		}
 
@@ -137,23 +144,19 @@ export function AuthProvider({ children }) {
 		if (password !== confirmPassword) {
 			return { success: false, error: "passwordMismatch" };
 		}
-
-		const result = await saveRegisteredUser(AsyncStorage, {
-			name,
-			phone,
-			email,
-			role: profileRole,
-			password,
-		});
-
-		if (!result.success) {
-			return result;
+		if (!verificationToken) {
+			return { success: false, error: "phoneNotVerified" };
 		}
 
-		await persistSession(createUserSession(result.user));
-		lastActivityRef.current = Date.now();
-		await trackLoginEvent();
-		return { success: true };
+		try {
+			const result = await registerAccount({ name, phone, countryCode, email, profileRole, password, verificationToken });
+			await persistSession({ ...createUserSession(result.user), token: result.token });
+			lastActivityRef.current = Date.now();
+			await trackLoginEvent();
+			return { success: true };
+		} catch (error) {
+			return { success: false, error: error.code || "serverError" };
+		}
 	}, []);
 
 	const loginAsGuest = useCallback(async () => {

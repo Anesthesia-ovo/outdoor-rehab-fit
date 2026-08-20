@@ -12,13 +12,14 @@ import {
 	TouchableOpacity,
 	View,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
 import { RFValue } from "react-native-responsive-fontsize";
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
 import { LocaleContext } from "../contexts/LocaleContext";
 import { showAlert } from "../utils/alert";
-import { resetPasswordWithCode, sendDemoVerificationCode } from "../constants/auth";
+import { requestSmsCode, resetPassword, verifySmsCode } from "../utils/api";
+import CountrySelector from "../components/CountrySelector";
+import { isValidInternationalPhone } from "../constants/countries";
 
 const ERROR_MESSAGES = {
 	accountNotFound: "accountNotFound",
@@ -29,6 +30,13 @@ const ERROR_MESSAGES = {
 	passwordMismatch: "passwordMismatch",
 	invalidCode: "invalidCode",
 	codeExpired: "codeExpired",
+	smsDeliveryFailed: "smsDeliveryFailed",
+	smsRateLimited: "smsRateLimited",
+	smsVerificationFailed: "smsVerificationFailed",
+	invalidOrExpiredCode: "invalidCode",
+	phoneNotVerified: "invalidCode",
+	networkError: "networkError",
+	serverError: "serverError",
 };
 
 export default function ForgotPasswordScreen() {
@@ -36,58 +44,58 @@ export default function ForgotPasswordScreen() {
 	const { from } = useLocalSearchParams();
 	const [step, setStep] = useState(1);
 	const [identifier, setIdentifier] = useState("");
+	const [countryCode, setCountryCode] = useState("+852");
 	const [code, setCode] = useState("");
 	const [newPassword, setNewPassword] = useState("");
 	const [confirmPassword, setConfirmPassword] = useState("");
-	const [demoCode, setDemoCode] = useState("");
-	const [channel, setChannel] = useState("");
 	const [submitting, setSubmitting] = useState(false);
 
 	const handleSendCode = async () => {
-		if (!identifier.trim()) {
-			showAlert(i18n.t("warning"), i18n.t("resetIdentifierRequired"));
+		if (!isValidInternationalPhone(identifier, countryCode)) {
+			showAlert(i18n.t("warning"), i18n.t("invalidPhone"));
 			return;
 		}
 
 		setSubmitting(true);
-		const result = await sendDemoVerificationCode(AsyncStorage, identifier);
-		setSubmitting(false);
-
-		if (!result.success) {
-			const messageKey = ERROR_MESSAGES[result.error] || "accountNotFound";
-			showAlert(i18n.t("warning"), i18n.t(messageKey));
-			return;
+		try {
+			await requestSmsCode(identifier, "password_reset", countryCode);
+			setStep(2);
+			showAlert(i18n.t("codeSentTitle"), i18n.t("codeSentSimple"));
+		} catch (error) {
+			showAlert(i18n.t("warning"), i18n.t(ERROR_MESSAGES[error.code] || "serverError"));
+		} finally {
+			setSubmitting(false);
 		}
-
-		setDemoCode(result.demoCode);
-		setChannel(result.channel);
-		setStep(2);
-		showAlert(
-			i18n.t("codeSentTitle"),
-			i18n.t("codeSentDemoMessage", {
-				channel: result.channel === "email" ? i18n.t("emailChannel") : i18n.t("phoneChannel"),
-				code: result.demoCode,
-			})
-		);
 	};
 
 	const handleResetPassword = async () => {
-		setSubmitting(true);
-		const result = await resetPasswordWithCode(AsyncStorage, identifier, code, newPassword, confirmPassword);
-		setSubmitting(false);
-
-		if (!result.success) {
-			const messageKey = ERROR_MESSAGES[result.error] || "resetRequired";
-			showAlert(i18n.t("warning"), i18n.t(messageKey));
+		if (!/^\d{6}$/.test(code) || !newPassword || !confirmPassword) {
+			showAlert(i18n.t("warning"), i18n.t("resetRequired"));
 			return;
 		}
-
-		showAlert("", i18n.t("resetSuccess"), [
-			{
-				text: "OK",
-				onPress: () => router.replace({ pathname: "/login", params: { from } }),
-			},
-		]);
+		if (newPassword.length < 8) {
+			showAlert(i18n.t("warning"), i18n.t("passwordTooShort"));
+			return;
+		}
+		if (newPassword !== confirmPassword) {
+			showAlert(i18n.t("warning"), i18n.t("passwordMismatch"));
+			return;
+		}
+		setSubmitting(true);
+		try {
+			const verified = await verifySmsCode(identifier, code, "password_reset", countryCode);
+			await resetPassword(identifier, newPassword, verified.verificationToken, countryCode);
+			showAlert("", i18n.t("resetSuccess"), [
+				{
+					text: "OK",
+					onPress: () => router.replace({ pathname: "/login", params: { from } }),
+				},
+			]);
+		} catch (error) {
+			showAlert(i18n.t("warning"), i18n.t(ERROR_MESSAGES[error.code] || "serverError"));
+		} finally {
+			setSubmitting(false);
+		}
 	};
 
 	return (
@@ -104,22 +112,29 @@ export default function ForgotPasswordScreen() {
 
 						<View style={styles.formCard}>
 							<View style={styles.demoBadge}>
-								<Text style={styles.demoBadgeText}>{i18n.t("forgotPasswordDemoNote")}</Text>
+								<Text style={styles.demoBadgeText}>{i18n.t("forgotPasswordLiveNote")}</Text>
 							</View>
 
 							{step === 1 ? (
 								<>
-									<Text style={styles.label}>{i18n.t("loginIdentifier")}</Text>
-									<TextInput
-										style={styles.input}
-										value={identifier}
-										onChangeText={setIdentifier}
-										autoCapitalize="none"
-										autoCorrect={false}
-										keyboardType="email-address"
-										placeholder={i18n.t("loginIdentifierPlaceholder")}
-										placeholderTextColor="#999"
-									/>
+									<Text style={styles.label}>{i18n.t("phone")}</Text>
+									<View style={styles.phoneRow}>
+										<CountrySelector
+											i18n={i18n}
+											value={countryCode}
+											onChange={(value) => { setCountryCode(value); setIdentifier(""); }}
+										/>
+										<TextInput
+											style={[styles.input, styles.phoneInput]}
+											value={identifier}
+											onChangeText={setIdentifier}
+											autoCapitalize="none"
+											autoCorrect={false}
+											keyboardType="phone-pad"
+											placeholder={i18n.t("internationalPhonePlaceholder")}
+											placeholderTextColor="#999"
+										/>
+									</View>
 
 									<TouchableOpacity
 										style={[styles.primaryButton, submitting && styles.buttonDisabled]}
@@ -136,16 +151,8 @@ export default function ForgotPasswordScreen() {
 							) : (
 								<>
 									<Text style={styles.sentHint}>
-										{i18n.t("codeSentTo", {
-											channel: channel === "email" ? i18n.t("emailChannel") : i18n.t("phoneChannel"),
-											target: identifier.trim(),
-										})}
+										{i18n.t("passwordResetCodeSent")}
 									</Text>
-									{!!demoCode && (
-										<Text style={styles.demoCodeText}>
-											{i18n.t("demoCodeLabel")}: {demoCode}
-										</Text>
-									)}
 
 									<Text style={styles.label}>{i18n.t("verificationCode")}</Text>
 									<TextInput
@@ -288,6 +295,17 @@ const styles = StyleSheet.create({
 		marginBottom: hp("2%"),
 		backgroundColor: "#fff",
 		color: "#333",
+	},
+	phoneRow: {
+		flexDirection: "row",
+		alignItems: "stretch",
+		gap: 8,
+		marginBottom: hp("2%"),
+	},
+	phoneInput: {
+		flex: 1,
+		minWidth: 0,
+		marginBottom: 0,
 	},
 	sentHint: {
 		fontSize: RFValue(13),

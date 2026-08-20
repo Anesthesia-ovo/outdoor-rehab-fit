@@ -19,6 +19,7 @@ import { LocaleContext } from "../contexts/LocaleContext";
 import { showAlert } from "../utils/alert";
 import { useAuth } from "../contexts/AuthContext";
 import { navigateAfterAuth } from "../utils/onboarding";
+import CountrySelector from "../components/CountrySelector";
 
 const ERROR_MESSAGES = {
 	loginRequired: "loginRequired",
@@ -35,6 +36,7 @@ export default function LoginScreen() {
 	const isFromSettings = from === "settings";
 	const [identifier, setIdentifier] = useState("");
 	const [password, setPassword] = useState("");
+	const [countryCode, setCountryCode] = useState("+852");
 	const [submitting, setSubmitting] = useState(false);
 
 	useEffect(() => {
@@ -50,7 +52,7 @@ export default function LoginScreen() {
 		}
 
 		setSubmitting(true);
-		const result = await login(identifier, password);
+		const result = await login(identifier, password, countryCode);
 		setSubmitting(false);
 
 		if (!result.success) {
@@ -107,8 +109,10 @@ export default function LoginScreen() {
 
 						<View style={styles.formCard}>
 							<Text style={styles.label}>{i18n.t("loginIdentifier")}</Text>
-							<TextInput
-								style={styles.input}
+							<View style={styles.identifierRow}>
+								<CountrySelector i18n={i18n} value={countryCode} onChange={setCountryCode} />
+								<TextInput
+								style={[styles.input, styles.identifierInput]}
 								value={identifier}
 								onChangeText={setIdentifier}
 								autoCapitalize="none"
@@ -116,7 +120,8 @@ export default function LoginScreen() {
 								keyboardType="email-address"
 								placeholder={i18n.t("loginIdentifierPlaceholder")}
 								placeholderTextColor="#999"
-							/>
+								/>
+							</View>
 							<Text style={styles.hint}>{i18n.t("loginIdentifierHint")}</Text>
 
 							<Text style={styles.label}>{i18n.t("password")}</Text>
@@ -245,6 +250,17 @@ const styles = StyleSheet.create({
 		marginBottom: hp("2%"),
 		backgroundColor: "#fff",
 		color: "#333",
+	},
+	identifierRow: {
+		flexDirection: "row",
+		alignItems: "stretch",
+		gap: 8,
+		marginBottom: hp("2%"),
+	},
+	identifierInput: {
+		flex: 1,
+		minWidth: 0,
+		marginBottom: 0,
 	},
 	forgotPasswordButton: {
 		alignSelf: "flex-end",

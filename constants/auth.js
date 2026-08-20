@@ -26,7 +26,7 @@ export const PRESET_USER = {
 export const DEMO_VERIFICATION_CODE = "123456";
 export const RESET_CODE_TTL_MS = 10 * 60 * 1000;
 
-export const MIN_PASSWORD_LENGTH = 6;
+export const MIN_PASSWORD_LENGTH = 8;
 
 export function normalizePhone(phone) {
 	return phone.replace(/\D/g, "").replace(/^852/, "");

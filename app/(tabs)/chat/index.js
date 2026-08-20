@@ -1,374 +1,50 @@
-// App Upgrade #7: custom SMS/group chat (text, photos, emoji reactions)
-// App Upgrade #8: chatbot as group leader (Monday message) + enquiry handler (FAQ)
 import React, { useCallback, useContext, useRef, useState } from "react";
-import {
-	StyleSheet,
-	View,
-	Text,
-	TextInput,
-	TouchableOpacity,
-	FlatList,
-	Image,
-	KeyboardAvoidingView,
-	Platform,
-	Modal,
-} from "react-native";
+import { FlatList, Image, KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
-import { RFValue } from "react-native-responsive-fontsize";
-import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
-import { LocaleContext } from "../../../contexts/LocaleContext";
 import { AuthContext } from "../../../contexts/AuthContext";
-import { getMessages, appendMessage, addReaction, ensureWeeklyBotMessage, getBotReply } from "../../../utils/chat";
+import { LocaleContext } from "../../../contexts/LocaleContext";
+import CountrySelector from "../../../components/CountrySelector";
+import { addChatGroupMember, createChatConversation, createChatGroup, dissolveChatGroup, getChatConversationDetails, getChatConversations, getConversationMessages, leaveChatGroup, renameChatGroup, searchChatParticipant, sendConversationMessage, toggleConversationReaction } from "../../../utils/api";
 
-const REACTION_EMOJIS = ["👍", "❤️", "💪", "👏", "😄", "🎉"];
+const REACTIONS = ["👍", "❤️", "💪", "👏", "😄", "🎉"];
 
-const GroupChat = () => {
-	const { i18n, locale } = useContext(LocaleContext);
-	const { user } = useContext(AuthContext);
-	const insets = useSafeAreaInsets();
-	const [messages, setMessages] = useState([]);
-	const [text, setText] = useState("");
-	const [reactionTarget, setReactionTarget] = useState(null);
-	const listRef = useRef(null);
+export default function Chat() {
+	const { user } = useContext(AuthContext); const { i18n, locale } = useContext(LocaleContext); const insets = useSafeAreaInsets(); const listRef = useRef(null);
+	const [conversations, setConversations] = useState([]); const [selected, setSelected] = useState(null); const [messages, setMessages] = useState([]); const [text, setText] = useState("");
+	const [countryCode, setCountryCode] = useState("+852"); const [phone, setPhone] = useState(""); const [found, setFound] = useState(null); const [reactionTarget, setReactionTarget] = useState(null); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
+	const [groupTitle, setGroupTitle] = useState("");
+	const [details, setDetails] = useState(null); const [settingsVisible, setSettingsVisible] = useState(false); const [renameTitle, setRenameTitle] = useState("");
 
-	const myName = () =>
-		user?.isGuest || user?.name === "guest" ? i18n.t("guestUser") : user?.name || user?.username || i18n.t("meName");
+	const loadConversations = useCallback(async () => { if (!user?.token) return; try { setConversations((await getChatConversations(user.token)).conversations); setError(""); } catch { setError("聊天列表同步失败，请检查网络。"); } }, [user?.token]);
+	const loadMessages = useCallback(async (conversation = selected) => { if (!user?.token || !conversation?.id) return; try { const result = await getConversationMessages(user.token, conversation.id); setMessages(result.messages.map((m) => ({ ...m, sender: m.isMine ? "me" : "other" }))); setError(""); } catch { setError("消息同步失败，请稍后重试。"); } }, [user?.token, selected]);
+	useFocusEffect(useCallback(() => { if (!user?.token) { setError("请先登录账号后使用聊天。"); return undefined; } if (selected) loadMessages(selected); else loadConversations(); const timer = setInterval(() => selected ? loadMessages(selected) : loadConversations(), 5000); return () => clearInterval(timer); }, [user?.token, selected, loadConversations, loadMessages]));
+	const openConversation = async (conversation) => { setSelected(conversation); setMessages([]); await loadMessages(conversation); };
+	const search = async () => { if (!phone.trim() || busy) return; setBusy(true); setFound(null); try { const result = await searchChatParticipant(user.token, phone.trim(), countryCode); setFound(result.participant); setError(result.participant ? "" : "未找到此参与者，请确认完整电话号码及国家区号。"); } catch { setError("电话号码格式不正确，或搜索失败。"); } finally { setBusy(false); } };
+	const addParticipant = async () => { if (!found || busy) return; setBusy(true); try { const result = await createChatConversation(user.token, found.id); const target = { ...result.conversation, otherUserName: found.name, otherUserPhone: found.phone, type: "direct" }; setPhone(""); setFound(null); await loadConversations(); await openConversation(target); } catch { setError("添加参与者失败，请稍后重试。"); } finally { setBusy(false); } };
+	const createGroup = async () => { if (!found || !groupTitle.trim() || busy) return; setBusy(true); try { const result = await createChatGroup(user.token, groupTitle.trim(), [found.id]); setPhone(""); setFound(null); setGroupTitle(""); await loadConversations(); await openConversation(result.conversation); } catch { setError("建立群组失败，请检查群组名称。"); } finally { setBusy(false); } };
+	const addToGroup = async (group) => { if (!found || busy) return; setBusy(true); try { await addChatGroupMember(user.token, group.id, found.id); setFound(null); setPhone(""); await loadConversations(); setError(`已加入群组“${group.title}”`); } catch { setError("加入群组失败，只有群组建立者可以添加成员。"); } finally { setBusy(false); } };
+	const send = async (data) => { if (!selected || busy) return; setBusy(true); try { await sendConversationMessage(user.token, selected.id, data); await loadMessages(selected); setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80); } catch { setError("消息发送失败，请稍后重试。"); } finally { setBusy(false); } };
+	const sendText = async () => { const value = text.trim(); if (!value) return; setText(""); await send({ type: "text", text: value }); };
+	const sendPhoto = async () => { const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.35, base64: true }); const asset = result.assets?.[0]; if (result.canceled || !asset?.base64) return; const mime = ["image/jpeg", "image/png", "image/webp"].includes(asset.mimeType) ? asset.mimeType : "image/jpeg"; await send({ type: "image", imageData: `data:${mime};base64,${asset.base64}` }); };
+	const react = async (emoji) => { await toggleConversationReaction(user.token, selected.id, reactionTarget, emoji); setReactionTarget(null); await loadMessages(selected); };
+	const openSettings = async () => { try { const result = await getChatConversationDetails(user.token, selected.id); setDetails(result); setRenameTitle(result.conversation.title || ""); setSettingsVisible(true); } catch { setError("无法读取聊天资料。"); } };
+	const saveGroupName = async () => { if (!renameTitle.trim()) return; await renameChatGroup(user.token, selected.id, renameTitle.trim()); setSelected((value) => ({ ...value, title: renameTitle.trim() })); setSettingsVisible(false); await loadConversations(); };
+	const exitOrDissolve = async () => { if (Platform.OS === "web" && !window.confirm(details?.conversation.myRole === "owner" ? "确定解散该群组吗？" : "确定退出该群组吗？")) return; if (details?.conversation.myRole === "owner") await dissolveChatGroup(user.token, selected.id); else await leaveChatGroup(user.token, selected.id); setSettingsVisible(false); setSelected(null); setMessages([]); await loadConversations(); };
 
-	const load = useCallback(async () => {
-		let msgs = await getMessages();
-		if (msgs.length === 0) {
-			msgs = await appendMessage({
-				sender: "staff",
-				senderName: i18n.t("staffName"),
-				type: "text",
-				text: i18n.t("chatWelcome"),
-				timestamp: new Date().toISOString(),
-			});
-		}
-		const posted = await ensureWeeklyBotMessage(i18n);
-		if (posted) msgs = await getMessages();
-		setMessages(msgs);
-	}, [i18n]);
+	if (!selected) return <View style={styles.page}>
+		{user?.profileRole === "staff" && <View style={styles.searchCard}><Text style={styles.heading}>新聊天或群组</Text><Text style={styles.hint}>按完整电话号码搜索参与者；可私聊、建立群组或加入已有群组</Text><View style={styles.searchRow}><CountrySelector i18n={i18n} value={countryCode} onChange={setCountryCode} /><TextInput style={styles.phoneInput} value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="手机号码" /><TouchableOpacity style={styles.searchBtn} onPress={search}><Text style={styles.btnText}>{busy ? "…" : "搜索"}</Text></TouchableOpacity></View>{found && <View style={{ marginTop: 10 }}><View style={styles.result}><View style={{ flex: 1 }}><Text style={styles.person}>{found.name}</Text><Text style={styles.meta}>{found.phone}</Text></View><TouchableOpacity style={styles.addBtn} onPress={addParticipant}><Text style={styles.btnText}>私聊</Text></TouchableOpacity></View><View style={styles.searchRow}><TextInput style={styles.phoneInput} value={groupTitle} onChangeText={setGroupTitle} placeholder="新群组名称" /><TouchableOpacity style={styles.addBtn} onPress={createGroup}><Text style={styles.btnText}>建立群组</Text></TouchableOpacity></View>{conversations.filter((item) => item.type === "group").map((group) => <TouchableOpacity key={group.id} style={styles.groupChoice} onPress={() => addToGroup(group)}><Text style={styles.person}>＋ 加入 {group.title}</Text><Text style={styles.meta}>{group.memberCount || 0} 名成员</Text></TouchableOpacity>)}</View>}</View>}
+		<Text style={styles.listHeading}>聊天</Text>{!!error && <Text style={styles.error}>{error}</Text>}<FlatList data={conversations} keyExtractor={(item) => item.id} contentContainerStyle={styles.conversationList} ListEmptyComponent={<Text style={styles.empty}>暂时没有聊天记录</Text>} renderItem={({ item }) => <TouchableOpacity style={styles.conversation} onPress={() => openConversation(item)}><View style={styles.avatar}><Ionicons name={item.type === "group" ? "people" : "person"} size={22} color="#840B1C" /></View><View style={{ flex: 1 }}><Text style={styles.person}>{item.type === "group" ? item.title : item.otherUserName || item.title}</Text><Text style={styles.meta} numberOfLines={1}>{item.lastMessage || "开始聊天"}</Text></View>{item.unreadCount > 0 && <Text style={styles.badge}>{item.unreadCount}</Text>}</TouchableOpacity>} />
+	</View>;
 
-	useFocusEffect(
-		useCallback(() => {
-			load();
-		}, [load])
-	);
+	return <KeyboardAvoidingView style={styles.page} behavior={Platform.OS === "ios" ? "padding" : undefined}><View style={styles.chatHeader}><TouchableOpacity onPress={() => { setSelected(null); setMessages([]); }}><Ionicons name="chevron-back" size={27} color="#840B1C" /></TouchableOpacity><View style={{ flex: 1 }}><Text style={styles.person}>{selected.type === "group" ? selected.title : selected.otherUserName || selected.title}</Text>{selected.otherUserPhone && <Text style={styles.meta}>{selected.otherUserPhone}</Text>}</View><TouchableOpacity onPress={openSettings} style={styles.iconBtn}><Ionicons name="ellipsis-horizontal" size={27} color="#333" /></TouchableOpacity></View>
+		<FlatList ref={listRef} data={messages} keyExtractor={(item) => item.id} contentContainerStyle={styles.messages} onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })} renderItem={({ item }) => <TouchableOpacity onLongPress={() => setReactionTarget(item.id)} style={[styles.msgRow, item.sender === "me" && styles.mine]}><View style={[styles.bubble, item.sender === "me" ? styles.bubbleMine : styles.bubbleOther]}>{item.sender !== "me" && <Text style={styles.sender}>{item.senderName}</Text>}{item.type === "image" ? <Image source={{ uri: item.imageUri }} style={styles.image} /> : <Text style={[styles.msgText, item.sender === "me" && { color: "#fff" }]}>{item.text}</Text>}<Text style={[styles.time, item.sender === "me" && { color: "#f0d0d0" }]}>{new Date(item.timestamp).toLocaleTimeString(locale === "zh" ? "zh-HK" : "en-US", { hour: "2-digit", minute: "2-digit" })}</Text>{item.reactions && <Text style={styles.reactions}>{Object.entries(item.reactions).map(([e,c]) => `${e} ${c}`).join("  ")}</Text>}</View></TouchableOpacity>} />
+		{!!error && <Text style={styles.error}>{error}</Text>}<View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 10) }]}><TouchableOpacity onPress={sendPhoto} style={styles.iconBtn}><Ionicons name="image" size={24} color="#840B1C" /></TouchableOpacity><TextInput style={styles.input} value={text} onChangeText={setText} multiline placeholder="输入消息…" /><TouchableOpacity style={styles.sendBtn} onPress={sendText} disabled={!text.trim() || busy}><Ionicons name="send" size={18} color="#fff" /></TouchableOpacity></View>
+		<Modal visible={!!reactionTarget} transparent animationType="fade" onRequestClose={() => setReactionTarget(null)}><TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setReactionTarget(null)}><View style={styles.picker}>{REACTIONS.map((emoji) => <TouchableOpacity key={emoji} onPress={() => react(emoji)}><Text style={styles.emoji}>{emoji}</Text></TouchableOpacity>)}</View></TouchableOpacity></Modal>
+		<Modal visible={settingsVisible} transparent animationType="slide" onRequestClose={() => setSettingsVisible(false)}><View style={styles.overlay}><View style={styles.settingsCard}><View style={styles.settingsHeader}><Text style={styles.heading}>聊天信息</Text><TouchableOpacity onPress={() => setSettingsVisible(false)}><Text style={styles.close}>×</Text></TouchableOpacity></View>{details?.conversation.type === "group" && details.conversation.canManage && <><Text style={styles.hint}>群组名称</Text><View style={styles.searchRow}><TextInput style={styles.phoneInput} value={renameTitle} onChangeText={setRenameTitle} /><TouchableOpacity style={styles.addBtn} onPress={saveGroupName}><Text style={styles.btnText}>保存群名</Text></TouchableOpacity></View></>}<Text style={[styles.heading,{fontSize:16,marginTop:14}]}>成员（{details?.members?.length || 0}）</Text>{details?.members?.map((member) => <View key={member.id} style={styles.memberRow}><Ionicons name="person-circle" size={30} color="#840B1C" /><View><Text style={styles.person}>{member.name}{member.memberRole === "owner" ? "（群主）" : ""}</Text>{member.phone ? <Text style={styles.meta}>{member.phone}</Text> : null}</View></View>)}{details?.conversation.type === "group" && <TouchableOpacity style={styles.dangerBtn} onPress={exitOrDissolve}><Text style={styles.dangerText}>{details?.conversation.myRole === "owner" ? "解散群组" : "退出群组"}</Text></TouchableOpacity>}</View></View></Modal>
+	</KeyboardAvoidingView>;
+}
 
-	const scrollToEnd = () => {
-		setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
-	};
-
-	const handleSend = async () => {
-		const content = text.trim();
-		if (!content) return;
-		setText("");
-		let msgs = await appendMessage({
-			sender: "me",
-			senderName: myName(),
-			type: "text",
-			text: content,
-			timestamp: new Date().toISOString(),
-		});
-		setMessages([...msgs]);
-		scrollToEnd();
-
-		// Chatbot enquiry handler: reply only when FAQ keywords match
-		const reply = getBotReply(content, locale);
-		if (reply) {
-			setTimeout(async () => {
-				const next = await appendMessage({
-					sender: "bot",
-					senderName: i18n.t("chatbotName"),
-					type: "text",
-					text: reply,
-					timestamp: new Date().toISOString(),
-				});
-				setMessages([...next]);
-				scrollToEnd();
-			}, 600);
-		}
-	};
-
-	const handleSendPhoto = async () => {
-		const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.5 });
-		if (!result.canceled && result.assets?.length) {
-			const msgs = await appendMessage({
-				sender: "me",
-				senderName: myName(),
-				type: "image",
-				imageUri: result.assets[0].uri,
-				timestamp: new Date().toISOString(),
-			});
-			setMessages([...msgs]);
-			scrollToEnd();
-		}
-	};
-
-	const handleReaction = async (emoji) => {
-		if (!reactionTarget) return;
-		const msgs = await addReaction(reactionTarget, emoji);
-		setMessages([...msgs]);
-		setReactionTarget(null);
-	};
-
-	const renderMessage = ({ item }) => {
-		const isMe = item.sender === "me";
-		const isBot = item.sender === "bot";
-		const isSession = item.type === "session";
-		return (
-			<TouchableOpacity
-				activeOpacity={0.8}
-				onLongPress={() => setReactionTarget(item.id)}
-				style={[styles.msgRow, isMe ? styles.msgRowMe : styles.msgRowOther]}
-			>
-				<View
-					style={[
-						styles.bubble,
-						isMe ? styles.bubbleMe : isBot ? styles.bubbleBot : styles.bubbleOther,
-						isSession && styles.bubbleSession,
-					]}
-				>
-					{!isMe && (
-						<Text style={[styles.sender, isBot && { color: "#840B1C" }]}>
-							{isBot ? `🤖 ${item.senderName}` : item.senderName}
-						</Text>
-					)}
-					{isSession && (
-						<View style={styles.sessionTag}>
-							<Ionicons name="fitness" size={RFValue(12)} color="#840B1C" />
-							<Text style={styles.sessionTagText}>{i18n.t("sharedSessionTag")}</Text>
-						</View>
-					)}
-					{item.type === "image" ? (
-						<Image source={{ uri: item.imageUri }} style={styles.msgImage} />
-					) : (
-						<Text style={[styles.msgText, isMe && !isSession && { color: "#fff" }]}>{item.text}</Text>
-					)}
-					<Text style={[styles.time, isMe && !isSession && { color: "#f0d0d0" }]}>
-						{new Date(item.timestamp).toLocaleTimeString(locale === "zh" ? "zh-HK" : "en-US", {
-							hour: "2-digit",
-							minute: "2-digit",
-						})}
-					</Text>
-					{item.reactions && Object.keys(item.reactions).length > 0 && (
-						<View style={styles.reactionRow}>
-							{Object.entries(item.reactions).map(([emoji, count]) => (
-								<View key={emoji} style={styles.reactionChip}>
-									<Text style={styles.reactionText}>
-										{emoji} {count}
-									</Text>
-								</View>
-							))}
-						</View>
-					)}
-				</View>
-			</TouchableOpacity>
-		);
-	};
-
-	const bottomPad = Math.max(insets.bottom, 12) + 8;
-
-	return (
-		<KeyboardAvoidingView
-			behavior={Platform.OS === "ios" ? "padding" : undefined}
-			style={styles.container}
-			keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 0}
-		>
-			<FlatList
-				ref={listRef}
-				data={messages}
-				keyExtractor={(item) => item.id}
-				renderItem={renderMessage}
-				contentContainerStyle={{ padding: wp("4%"), paddingBottom: hp("2%") }}
-				onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
-			/>
-
-			<View style={[styles.inputBar, { paddingBottom: bottomPad }]}>
-				<TouchableOpacity style={styles.photoBtn} onPress={handleSendPhoto}>
-					<Ionicons name="image" size={RFValue(24)} color="#840B1C" />
-				</TouchableOpacity>
-				<TextInput
-					style={styles.input}
-					placeholder={i18n.t("messagePlaceholder")}
-					value={text}
-					onChangeText={setText}
-					multiline
-				/>
-				<TouchableOpacity
-					style={[styles.sendBtn, !text.trim() && styles.sendBtnDisabled]}
-					onPress={handleSend}
-					disabled={!text.trim()}
-					accessibilityLabel={i18n.t("send")}
-				>
-					<Ionicons name="send" size={RFValue(18)} color="#fff" />
-				</TouchableOpacity>
-			</View>
-
-			<Modal visible={!!reactionTarget} transparent animationType="fade" onRequestClose={() => setReactionTarget(null)}>
-				<TouchableOpacity style={styles.reactionOverlay} activeOpacity={1} onPress={() => setReactionTarget(null)}>
-					<View style={styles.reactionPicker}>
-						{REACTION_EMOJIS.map((emoji) => (
-							<TouchableOpacity key={emoji} style={styles.reactionOption} onPress={() => handleReaction(emoji)}>
-								<Text style={styles.reactionOptionText}>{emoji}</Text>
-							</TouchableOpacity>
-						))}
-					</View>
-				</TouchableOpacity>
-			</Modal>
-		</KeyboardAvoidingView>
-	);
-};
-
-const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: "#F5F1EA",
-	},
-	msgRow: {
-		marginBottom: 12,
-		flexDirection: "row",
-	},
-	msgRowMe: {
-		justifyContent: "flex-end",
-	},
-	msgRowOther: {
-		justifyContent: "flex-start",
-	},
-	bubble: {
-		maxWidth: "80%",
-		borderRadius: 16,
-		padding: 12,
-	},
-	bubbleMe: {
-		backgroundColor: "#840B1C",
-		borderBottomRightRadius: 4,
-	},
-	bubbleOther: {
-		backgroundColor: "#fff",
-		borderBottomLeftRadius: 4,
-	},
-	bubbleBot: {
-		backgroundColor: "#FFF3E6",
-		borderWidth: 1,
-		borderColor: "#F0C9A0",
-		borderBottomLeftRadius: 4,
-	},
-	bubbleSession: {
-		backgroundColor: "#EEF7F0",
-		borderWidth: 1,
-		borderColor: "#B7D9C0",
-	},
-	sessionTag: {
-		flexDirection: "row",
-		alignItems: "center",
-		marginBottom: 6,
-		gap: 4,
-	},
-	sessionTagText: {
-		fontSize: RFValue(11),
-		color: "#840B1C",
-		fontWeight: "600",
-	},
-	sender: {
-		fontSize: RFValue(12),
-		fontWeight: "bold",
-		color: "#666",
-		marginBottom: 4,
-	},
-	msgText: {
-		fontSize: RFValue(15),
-		color: "#333",
-		lineHeight: RFValue(22),
-	},
-	msgImage: {
-		width: wp("55%"),
-		height: wp("55%"),
-		borderRadius: 10,
-		resizeMode: "cover",
-	},
-	time: {
-		fontSize: RFValue(10),
-		color: "#999",
-		marginTop: 6,
-		alignSelf: "flex-end",
-	},
-	reactionRow: {
-		flexDirection: "row",
-		flexWrap: "wrap",
-		marginTop: 6,
-		gap: 4,
-	},
-	reactionChip: {
-		backgroundColor: "rgba(0,0,0,0.06)",
-		borderRadius: 10,
-		paddingHorizontal: 8,
-		paddingVertical: 3,
-		marginRight: 4,
-	},
-	reactionText: {
-		fontSize: RFValue(12),
-	},
-	inputBar: {
-		flexDirection: "row",
-		alignItems: "flex-end",
-		paddingHorizontal: 10,
-		paddingTop: 10,
-		backgroundColor: "#fff",
-		borderTopWidth: 1,
-		borderTopColor: "#eee",
-	},
-	photoBtn: {
-		padding: 10,
-		marginBottom: 2,
-	},
-	input: {
-		flex: 1,
-		borderWidth: 1,
-		borderColor: "#ddd",
-		borderRadius: 20,
-		paddingHorizontal: 14,
-		paddingVertical: 10,
-		fontSize: RFValue(15),
-		maxHeight: hp("12%"),
-		minHeight: 42,
-		backgroundColor: "#f8f9fa",
-	},
-	sendBtn: {
-		backgroundColor: "#840B1C",
-		borderRadius: 22,
-		width: 44,
-		height: 44,
-		justifyContent: "center",
-		alignItems: "center",
-		marginLeft: 8,
-		marginBottom: 2,
-	},
-	sendBtnDisabled: {
-		opacity: 0.45,
-	},
-	reactionOverlay: {
-		flex: 1,
-		backgroundColor: "rgba(0,0,0,0.3)",
-		justifyContent: "center",
-		alignItems: "center",
-	},
-	reactionPicker: {
-		flexDirection: "row",
-		backgroundColor: "#fff",
-		borderRadius: 30,
-		padding: 10,
-	},
-	reactionOption: {
-		padding: 8,
-	},
-	reactionOptionText: {
-		fontSize: RFValue(26),
-	},
-});
-
-export default GroupChat;
+const styles = StyleSheet.create({ page:{flex:1,backgroundColor:"#F5F1EA"},searchCard:{margin:16,padding:16,backgroundColor:"#fff",borderRadius:14},heading:{fontSize:19,fontWeight:"800",color:"#222"},hint:{fontSize:12,color:"#777",marginTop:4,marginBottom:12},searchRow:{flexDirection:"row",gap:8,marginTop:8},phoneInput:{flex:1,minWidth:80,borderWidth:1,borderColor:"#ddd",borderRadius:10,paddingHorizontal:12,backgroundColor:"#fff",minHeight:46},searchBtn:{backgroundColor:"#840B1C",borderRadius:9,paddingHorizontal:16,justifyContent:"center"},btnText:{color:"#fff",fontWeight:"700"},result:{flexDirection:"row",alignItems:"center",backgroundColor:"#F8F2F3",padding:12,borderRadius:10},addBtn:{backgroundColor:"#840B1C",borderRadius:8,padding:10,justifyContent:"center"},groupChoice:{backgroundColor:"#F4F5F7",padding:10,borderRadius:9,marginTop:7},listHeading:{fontSize:22,fontWeight:"800",marginHorizontal:18,marginBottom:8},conversationList:{paddingHorizontal:16,paddingBottom:30},conversation:{flexDirection:"row",alignItems:"center",backgroundColor:"#fff",borderRadius:12,padding:14,marginBottom:9},avatar:{width:44,height:44,borderRadius:22,backgroundColor:"#F4E9EB",alignItems:"center",justifyContent:"center",marginRight:12},person:{fontSize:15,fontWeight:"700",color:"#222"},meta:{fontSize:12,color:"#777",marginTop:3},badge:{backgroundColor:"#840B1C",color:"#fff",minWidth:23,textAlign:"center",padding:4,borderRadius:12,fontWeight:"700"},empty:{textAlign:"center",color:"#888",padding:30},error:{backgroundColor:"#FDECEC",color:"#9F1D2D",padding:9,textAlign:"center"},chatHeader:{height:64,backgroundColor:"#fff",flexDirection:"row",alignItems:"center",gap:10,paddingHorizontal:12,borderBottomWidth:1,borderBottomColor:"#eee"},messages:{padding:16},msgRow:{flexDirection:"row",marginBottom:10},mine:{justifyContent:"flex-end"},bubble:{maxWidth:"80%",padding:11,borderRadius:15},bubbleMine:{backgroundColor:"#840B1C",borderBottomRightRadius:3},bubbleOther:{backgroundColor:"#fff",borderBottomLeftRadius:3},sender:{fontSize:11,fontWeight:"700",color:"#666",marginBottom:4},msgText:{fontSize:15,color:"#333",lineHeight:21},time:{fontSize:9,color:"#999",alignSelf:"flex-end",marginTop:5},reactions:{fontSize:12,marginTop:5},image:{width:210,height:210,borderRadius:9},inputBar:{flexDirection:"row",alignItems:"flex-end",backgroundColor:"#fff",paddingTop:9,paddingHorizontal:9,borderTopWidth:1,borderTopColor:"#eee"},iconBtn:{padding:10},input:{flex:1,maxHeight:100,minHeight:42,borderWidth:1,borderColor:"#ddd",borderRadius:21,paddingHorizontal:13,paddingVertical:9,backgroundColor:"#fafafa"},sendBtn:{width:43,height:43,borderRadius:22,backgroundColor:"#840B1C",alignItems:"center",justifyContent:"center",marginLeft:8},overlay:{flex:1,backgroundColor:"rgba(0,0,0,.3)",alignItems:"center",justifyContent:"center",padding:18},picker:{flexDirection:"row",backgroundColor:"#fff",padding:12,borderRadius:30},emoji:{fontSize:25,padding:7},settingsCard:{width:"100%",maxWidth:480,maxHeight:"85%",backgroundColor:"#fff",borderRadius:16,padding:18},settingsHeader:{flexDirection:"row",justifyContent:"space-between",alignItems:"center"},close:{fontSize:30,color:"#666"},memberRow:{flexDirection:"row",alignItems:"center",gap:9,paddingVertical:9,borderBottomWidth:1,borderBottomColor:"#eee"},dangerBtn:{marginTop:20,borderWidth:1,borderColor:"#C62828",borderRadius:9,padding:12,alignItems:"center"},dangerText:{color:"#C62828",fontWeight:"800"} });

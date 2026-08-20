@@ -35,4 +35,29 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# local runtime data and secrets
+.env
+.env.*
+!.env.example
+server/data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# local tooling and generated artifacts
+.dsh-uploads/
+.dsh-vision-router/
+tmp/
+output/
+figma-poster/
+
+# deployment build archives (keep deployment scripts/configuration)
+deploy/**/*.zip
+deploy/**/*.tar.gz
+deploy/**/*-web-*/
+deploy/**/*-combined-*/
+
+# generated office documents
+docs/*.docx
+
 app-example

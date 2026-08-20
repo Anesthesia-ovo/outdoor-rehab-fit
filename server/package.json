@@ -1,0 +1,17 @@
+{
+  "name": "outdoor-fit-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "better-sqlite3": "12.4.1",
+    "express": "5.2.1"
+  }
+}
